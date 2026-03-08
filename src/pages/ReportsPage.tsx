@@ -7,9 +7,10 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2, Download, FileDown } from 'lucide-react';
+import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ── Level config ─────────────────────────────────────────────────── */
 const WRITING_LEVELS: Record<string, { label: string; color: string; short: string }> = {
