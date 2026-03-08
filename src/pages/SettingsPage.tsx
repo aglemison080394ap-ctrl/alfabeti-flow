@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, School, User, Shield } from 'lucide-react';
+import { Save, School, Shield } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
   const { toast } = useToast();
@@ -16,10 +16,10 @@ const SettingsPage: React.FC = () => {
   const [schoolCity, setSchoolCity] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [creatingUser, setCreatingUser] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
   useEffect(() => {
     supabase.from('school_info').select('*').single().then(({ data }) => {
@@ -45,35 +45,34 @@ const SettingsPage: React.FC = () => {
     setLoading(false);
   };
 
-  const createUser = async (role: 'admin' | 'teacher') => {
-    if (!newEmail || !newPassword || !newName) {
+  const createAdmin = async () => {
+    if (!adminEmail || !adminPassword || !adminName) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' });
       return;
     }
-    if (newPassword.length < 6) {
+    if (adminPassword.length < 6) {
       toast({ title: 'Senha muito curta', description: 'Mínimo 6 caracteres', variant: 'destructive' });
       return;
     }
-    setCreatingUser(true);
+    setCreatingAdmin(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke('create-user', {
-        body: { email: newEmail, password: newPassword, name: newName, role },
+        body: { email: adminEmail, password: adminPassword, name: adminName, role: 'admin' },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
 
       if (res.error || res.data?.error) {
         const msg = res.data?.error || res.error?.message || 'Erro desconhecido';
-        toast({ title: 'Erro ao criar usuário', description: msg, variant: 'destructive' });
+        toast({ title: 'Erro ao criar administrador', description: msg, variant: 'destructive' });
       } else {
-        const label = role === 'admin' ? 'Administrador' : 'Professor';
-        toast({ title: `${label} criado!`, description: `${newName} foi cadastrado e pode fazer login.` });
-        setNewEmail(''); setNewName(''); setNewPassword('');
+        toast({ title: 'Administrador criado!', description: `${adminName} pode fazer login com o e-mail e senha definidos.` });
+        setAdminEmail(''); setAdminName(''); setAdminPassword('');
       }
     } catch (err) {
       toast({ title: 'Erro inesperado', description: String(err), variant: 'destructive' });
     }
-    setCreatingUser(false);
+    setCreatingAdmin(false);
   };
 
   return (
@@ -108,33 +107,31 @@ const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Create Users */}
+      {/* Create Admin */}
       <Card className="p-6 shadow-card">
         <div className="flex items-center gap-2 mb-5">
-          <User className="w-5 h-5 text-primary" />
-          <h2 className="font-display font-bold text-foreground">Criar Usuário</h2>
+          <Shield className="w-5 h-5 text-primary" />
+          <h2 className="font-display font-bold text-foreground">Criar Administrador</h2>
         </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Para cadastrar professores, acesse a página <strong>Professores</strong> no menu lateral.
+        </p>
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Nome completo</Label>
-            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do usuário" />
+            <Input value={adminName} onChange={e => setAdminName(e.target.value)} placeholder="Nome do administrador" />
           </div>
           <div className="space-y-2">
             <Label>E-mail</Label>
-            <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@escola.com" />
+            <Input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="admin@escola.com" />
           </div>
           <div className="space-y-2">
             <Label>Senha</Label>
-            <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            <Input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
           </div>
-          <div className="flex gap-3">
-            <Button onClick={() => createUser('teacher')} disabled={creatingUser} variant="outline" className="flex-1 gap-2">
-              <User className="w-4 h-4" /> {creatingUser ? 'Criando...' : 'Criar Professor'}
-            </Button>
-            <Button onClick={() => createUser('admin')} disabled={creatingUser} className="flex-1 gap-2 gradient-primary text-primary-foreground rounded-xl">
-              <Shield className="w-4 h-4" /> {creatingUser ? 'Criando...' : 'Criar Admin'}
-            </Button>
-          </div>
+          <Button onClick={createAdmin} disabled={creatingAdmin} className="gap-2 gradient-primary text-primary-foreground rounded-xl">
+            <Shield className="w-4 h-4" /> {creatingAdmin ? 'Criando...' : 'Criar Administrador'}
+          </Button>
         </div>
       </Card>
 

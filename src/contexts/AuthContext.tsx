@@ -17,6 +17,7 @@ interface AuthContextType {
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  setSessionFromTokens: (accessToken: string, refreshToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
+  // Used after teacher-login edge function returns tokens
+  const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
+    const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (error) throw error;
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -88,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin: profile?.role === 'admin',
       signIn,
       signOut,
+      setSessionFromTokens,
     }}>
       {children}
     </AuthContext.Provider>
