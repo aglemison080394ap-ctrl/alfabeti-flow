@@ -44,9 +44,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let initialized = false;
+
+    // Initialize from current session first (synchronous path)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (initialized) return; // already handled by onAuthStateChange
+      initialized = true;
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    // Then listen for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        initialized = true;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -57,15 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     );
-
-    // Then check current session — always resolve loading state
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // No session: onAuthStateChange may not fire, so unblock loading
-        setLoading(false);
-      }
-      // If session exists, onAuthStateChange will handle it and call setLoading(false)
-    });
 
     return () => subscription.unsubscribe();
   }, []);
