@@ -312,42 +312,45 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {/* ─── ADMIN: Ano (Geral + 1º ao 5º Ano) */}
+          {/* ─── ADMIN: 3 dropdowns fixos lado a lado */}
           {isAdmin && (
             <>
+              {/* 1º Filtro: Série/Ano */}
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-44 bg-card">
-                  <SelectValue placeholder="🏫 Escola Toda" />
+                <SelectTrigger className="w-48 bg-background border border-input rounded-lg shadow-sm">
+                  <SelectValue placeholder="Geral (Escola Toda)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">🏫 Escola Toda (Geral)</SelectItem>
+                  <SelectItem value="all">🏫 Geral (Escola Toda)</SelectItem>
                   {GRADE_YEARS.map(g => (
                     <SelectItem key={g} value={g}>{g}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              {/* Turma (letra) — só aparece quando um Ano está selecionado */}
-              {selectedYear !== 'all' && availableLetters.length > 0 && (
-                <Select value={selectedLetter} onValueChange={setSelectedLetter}>
-                  <SelectTrigger className="w-36 bg-card">
-                    <SelectValue placeholder="Turma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Turmas</SelectItem>
-                    {availableLetters.map(l => (
-                      <SelectItem key={l} value={l}>Turma {l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* 2º Filtro: Turma — sempre visível, desativado no modo Geral */}
+              <Select
+                value={selectedLetter}
+                onValueChange={setSelectedLetter}
+                disabled={selectedYear === 'all'}
+              >
+                <SelectTrigger className="w-36 bg-background border border-input rounded-lg shadow-sm disabled:opacity-50">
+                  <SelectValue placeholder="Turma" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {['A','B','C','D','E','F','G','H','I'].map(l => (
+                    <SelectItem key={l} value={l}>Turma {l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </>
           )}
 
           {/* ─── TEACHER: only their classes */}
           {!isAdmin && allClasses.length > 0 && (
             <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-48 bg-card">
+              <SelectTrigger className="w-48 bg-background border border-input rounded-lg shadow-sm">
                 <SelectValue placeholder="Selecione a turma" />
               </SelectTrigger>
               <SelectContent>
@@ -363,9 +366,9 @@ const Dashboard: React.FC = () => {
             </Select>
           )}
 
-          {/* Bimestre — shared */}
+          {/* 3º Filtro: Bimestre — sempre visível */}
           <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
-            <SelectTrigger className="w-40 bg-card">
+            <SelectTrigger className="w-44 bg-background border border-input rounded-lg shadow-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
