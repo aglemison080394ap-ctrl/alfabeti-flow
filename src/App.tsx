@@ -15,6 +15,7 @@ import StudentsPage from "@/pages/StudentsPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import TeacherProfilePage from "@/pages/TeacherProfilePage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,11 @@ const App = () => (
             <Route path="/configuracoes" element={
               <ProtectedRoute adminOnly>
                 <AppLayout><SettingsPage /></AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/meu-perfil" element={
+              <ProtectedRoute>
+                <AppLayout><TeacherProfilePage /></AppLayout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

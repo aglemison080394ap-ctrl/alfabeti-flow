@@ -11,17 +11,16 @@ import { Save, School, Shield, CalendarDays } from 'lucide-react';
 const SettingsPage: React.FC = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
-  const [schoolName, setSchoolName]               = useState('');
-  const [schoolAddress, setSchoolAddress]         = useState('');
-  const [schoolCity, setSchoolCity]               = useState('');
-  const [schoolCoordinator, setSchoolCoordinator] = useState('');
-  const [activeSchoolYear, setActiveSchoolYear]   = useState<string>(String(new Date().getFullYear()));
-  const [schoolId, setSchoolId]                   = useState('');
-  const [loading, setLoading]                     = useState(false);
-  const [adminEmail, setAdminEmail]               = useState('');
-  const [adminName, setAdminName]                 = useState('');
-  const [adminPassword, setAdminPassword]         = useState('');
-  const [creatingAdmin, setCreatingAdmin]         = useState(false);
+  const [schoolName, setSchoolName]             = useState('');
+  const [schoolAddress, setSchoolAddress]       = useState('');
+  const [schoolCity, setSchoolCity]             = useState('');
+  const [activeSchoolYear, setActiveSchoolYear] = useState<string>(String(new Date().getFullYear()));
+  const [schoolId, setSchoolId]                 = useState('');
+  const [loading, setLoading]                   = useState(false);
+  const [adminEmail, setAdminEmail]             = useState('');
+  const [adminName, setAdminName]               = useState('');
+  const [adminPassword, setAdminPassword]       = useState('');
+  const [creatingAdmin, setCreatingAdmin]       = useState(false);
 
   useEffect(() => {
     supabase.from('school_info').select('*').single().then(({ data }) => {
@@ -30,7 +29,6 @@ const SettingsPage: React.FC = () => {
         setSchoolName(data.name);
         setSchoolAddress(data.address || '');
         setSchoolCity(data.city || '');
-        setSchoolCoordinator((data as any).coordinator || '');
         setActiveSchoolYear(String((data as any).active_school_year || new Date().getFullYear()));
       }
     });
@@ -47,7 +45,6 @@ const SettingsPage: React.FC = () => {
       name:               schoolName,
       address:            schoolAddress,
       city:               schoolCity,
-      coordinator:        schoolCoordinator,
       active_school_year: yearNum,
     };
     const { error } = schoolId
@@ -121,18 +118,6 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Coordenador(a) Pedagógico(a) — padrão geral</Label>
-            <Input
-              value={schoolCoordinator}
-              onChange={e => setSchoolCoordinator(e.target.value)}
-              placeholder="Digite o nome do(a) coordenador(a)"
-            />
-            <p className="text-xs text-muted-foreground">
-              Usado como padrão nos relatórios. Pode ser substituído pelo coordenador definido em cada turma.
-            </p>
-          </div>
-
-          <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-primary" />
               Ano Letivo Vigente
@@ -145,7 +130,7 @@ const SettingsPage: React.FC = () => {
               maxLength={4}
             />
             <p className="text-xs text-muted-foreground">
-              Informe o ano letivo atual (ex: 2026). Aparece nos cabeçalhos dos relatórios.
+              Aparece nos cabeçalhos dos relatórios.
             </p>
           </div>
 
