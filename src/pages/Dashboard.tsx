@@ -30,10 +30,11 @@ const Dashboard: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const [allClasses, setAllClasses] = useState<any[]>([]);
 
-  // Admin cascading filters: selectedYear (grade_year or 'all'), selectedLetter, selectedBimestre
-  const [selectedYear, setSelectedYear]         = useState<string>('all');
-  const [selectedLetter, setSelectedLetter]     = useState<string>('all');
+  // Admin filters: selectedYear, selectedLetter, isOverallView (Visão Geral da Escola)
+  const [selectedYear, setSelectedYear]         = useState<string>('1º Ano');
+  const [selectedLetter, setSelectedLetter]     = useState<string>('A');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
+  const [isOverallView, setIsOverallView]       = useState<boolean>(false);
 
   // For teacher: just which of their classes
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -76,20 +77,15 @@ const Dashboard: React.FC = () => {
     loadClasses();
   }, [profile, isAdmin]);
 
-  // Derive available letters for the selected grade_year (admin)
-  const availableLetters = selectedYear === 'all'
-    ? [...new Set(allClasses.map(c => c.class_letter))].sort()
-    : [...new Set(allClasses.filter(c => c.grade_year === selectedYear).map(c => c.class_letter))].sort();
-
-  // Reset letter when year changes
+  // Reset letter when year changes (admin)
   useEffect(() => {
-    setSelectedLetter('all');
+    setSelectedLetter('A');
   }, [selectedYear]);
 
   // Compute which class IDs to query (admin)
   const adminClassIds = (() => {
-    let filtered = allClasses;
-    if (selectedYear !== 'all') filtered = filtered.filter(c => c.grade_year === selectedYear);
+    if (isOverallView) return allClasses.map(c => c.id);
+    let filtered = allClasses.filter(c => c.grade_year === selectedYear);
     if (selectedLetter !== 'all') filtered = filtered.filter(c => c.class_letter === selectedLetter);
     return filtered.map(c => c.id);
   })();
@@ -97,7 +93,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses]);
+  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
