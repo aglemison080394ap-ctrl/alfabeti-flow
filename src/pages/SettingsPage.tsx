@@ -14,6 +14,7 @@ const SettingsPage: React.FC = () => {
   const [schoolName, setSchoolName] = useState('');
   const [schoolAddress, setSchoolAddress] = useState('');
   const [schoolCity, setSchoolCity] = useState('');
+  const [schoolCoordinator, setSchoolCoordinator] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [loading, setLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -28,15 +29,22 @@ const SettingsPage: React.FC = () => {
         setSchoolName(data.name);
         setSchoolAddress(data.address || '');
         setSchoolCity(data.city || '');
+        setSchoolCoordinator((data as any).coordinator || '');
       }
     });
   }, []);
 
   const handleSaveSchool = async () => {
     setLoading(true);
+    const payload = {
+      name: schoolName,
+      address: schoolAddress,
+      city: schoolCity,
+      coordinator: schoolCoordinator,
+    };
     const { error } = schoolId
-      ? await supabase.from('school_info').update({ name: schoolName, address: schoolAddress, city: schoolCity }).eq('id', schoolId)
-      : await supabase.from('school_info').insert({ name: schoolName, address: schoolAddress, city: schoolCity });
+      ? await supabase.from('school_info').update(payload).eq('id', schoolId)
+      : await supabase.from('school_info').insert(payload);
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } else {
@@ -91,15 +99,25 @@ const SettingsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Nome da Escola</Label>
-            <Input value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Ex: Escola Municipal João da Silva" />
+            <Input value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Ex: E.M.E.F Roseli Paiva" />
           </div>
           <div className="space-y-2">
-            <Label>Endereço</Label>
-            <Input value={schoolAddress} onChange={e => setSchoolAddress(e.target.value)} placeholder="Rua, número, bairro" />
+            <Label>Coordenador(a) Pedagógico(a)</Label>
+            <Input
+              value={schoolCoordinator}
+              onChange={e => setSchoolCoordinator(e.target.value)}
+              placeholder="Nome do(a) coordenador(a)"
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Cidade / Estado</Label>
-            <Input value={schoolCity} onChange={e => setSchoolCity(e.target.value)} placeholder="Ex: São Paulo - SP" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Endereço</Label>
+              <Input value={schoolAddress} onChange={e => setSchoolAddress(e.target.value)} placeholder="Rua, número, bairro" />
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade / Estado</Label>
+              <Input value={schoolCity} onChange={e => setSchoolCity(e.target.value)} placeholder="Ex: Anajás - PA" />
+            </div>
           </div>
           <Button onClick={handleSaveSchool} disabled={loading} className="gap-2 gradient-primary text-primary-foreground rounded-xl">
             <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Dados'}
