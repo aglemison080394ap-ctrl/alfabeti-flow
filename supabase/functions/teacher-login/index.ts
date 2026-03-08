@@ -24,26 +24,28 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    const nameTrimmed = name.trim();
     const { data: teachers, error: lookupError } = await supabaseAdmin
       .from('teachers')
       .select('email, name')
-      .ilike('name', name.trim())
+      .ilike('name', `%${nameTrimmed}%`)
       .not('email', 'is', null)
       .limit(5);
 
     if (lookupError || !teachers || teachers.length === 0) {
       return new Response(JSON.stringify({ error: 'Professor não encontrado. Verifique o nome informado.' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Use the first match
-    const teacher = teachers[0];
+    // Prefer exact match (trimmed, case-insensitive), fall back to first result
+    const exactMatch = teachers.find(t => t.name.trim().toLowerCase() === nameTrimmed.toLowerCase());
+    const teacher = exactMatch || teachers[0];
     const email = teacher.email;
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Professor não possui acesso ao sistema.' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
