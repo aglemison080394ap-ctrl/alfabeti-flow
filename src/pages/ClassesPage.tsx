@@ -26,23 +26,20 @@ const ClassesPage: React.FC = () => {
   const [form, setForm] = useState({ grade_year: '', class_letter: '', teacher_id: '' });
 
   const fetchAll = async () => {
-    const [{ data: classesData }, { data: teachersData }] = await Promise.all([
+    const [{ data: classesData }, { data: teachersData }, { data: studentsData }] = await Promise.all([
       supabase.from('classes').select('*, teachers(name)').order('grade_year'),
       supabase.from('teachers').select('id, name').order('name'),
+      supabase.from('students').select('class_id'), // one query for all student counts
     ]);
     if (classesData) setClasses(classesData);
     if (teachersData) setTeachers(teachersData);
 
-    // Count students per class
-    if (classesData) {
+    // Build counts map from single students query
+    if (studentsData) {
       const counts: Record<string, number> = {};
-      await Promise.all(classesData.map(async (c) => {
-        const { count } = await supabase
-          .from('students')
-          .select('id', { count: 'exact', head: true })
-          .eq('class_id', c.id);
-        counts[c.id] = count || 0;
-      }));
+      studentsData.forEach(s => {
+        counts[s.class_id] = (counts[s.class_id] || 0) + 1;
+      });
       setStudentCounts(counts);
     }
     setLoading(false);

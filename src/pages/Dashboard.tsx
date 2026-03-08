@@ -4,10 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import { Users, ClipboardCheck, Clock, TrendingUp, School, BookOpen } from 'lucide-react';
+import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp } from 'lucide-react';
 
 const WRITING_LEVELS = {
   PS: { label: 'Pré-silábico', color: '#ef4444' },
@@ -24,78 +24,74 @@ const READING_LEVELS = {
 };
 
 const Dashboard: React.FC = () => {
-  const { isAdmin, profile } = useAuth();
+  const { profile } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    assessed: 0,
-    pending: 0,
-    totalClasses: 0,
-  });
+  const [stats, setStats] = useState({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: 0 });
   const [writingData, setWritingData] = useState<any[]>([]);
   const [readingData, setReadingData] = useState<any[]>([]);
   const [evolutionData, setEvolutionData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchClasses();
+    supabase
+      .from('classes')
+      .select('id, grade_year, class_letter')
+      .order('grade_year')
+      .then(({ data }) => { if (data) setClasses(data); });
   }, []);
 
   useEffect(() => {
     fetchDashboardData();
   }, [selectedClass, selectedBimestre]);
 
-  const fetchClasses = async () => {
-    const { data } = await supabase
-      .from('classes')
-      .select('*, teachers(name)')
-      .order('grade_year');
-    if (data) setClasses(data);
-  };
-
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Build students query
+      // Single query for students filtered by class
       let studentsQuery = supabase.from('students').select('id, class_id');
       if (selectedClass !== 'all') {
         studentsQuery = studentsQuery.eq('class_id', selectedClass);
       }
       const { data: students } = await studentsQuery;
-      const studentIds = students?.map(s => s.id) || [];
+      const studentIds = students?.map(s => s.id) ?? [];
+      const totalStudents = studentIds.length;
 
-      // Assessments for selected bimestre
-      let assessmentsQuery = supabase
-        .from('assessments')
-        .select('*')
-        .eq('bimestre', selectedBimestre as any);
-
-      if (studentIds.length > 0) {
-        assessmentsQuery = assessmentsQuery.in('student_id', studentIds);
+      if (totalStudents === 0) {
+        setStats({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: classes.length });
+        setWritingData([]);
+        setReadingData([]);
+        setEvolutionData([{ name: '1º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
+          { name: '2º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
+          { name: '3º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
+          { name: '4º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 }]);
+        setLoading(false);
+        return;
       }
 
-      const { data: assessments } = await assessmentsQuery;
+      // All assessments in one query (all bimestres at once)
+      const { data: allAssessments } = await supabase
+        .from('assessments')
+        .select('student_id, bimestre, writing_level, reading_level')
+        .in('student_id', studentIds.slice(0, 500)); // safety limit
 
-      const totalStudents = studentIds.length;
-      const assessed = assessments?.length || 0;
-      const pending = totalStudents - assessed;
+      // Filter for selected bimestre
+      const currentBimAssessments = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
+      const assessed = currentBimAssessments.length;
 
       setStats({
         totalStudents,
         assessed,
-        pending,
+        pending: totalStudents - assessed,
         totalClasses: classes.length,
       });
 
-      // Writing data
-      const writingCounts: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
-      assessments?.forEach(a => {
-        if (a.writing_level) writingCounts[a.writing_level]++;
-      });
+      // Writing distribution
+      const wCounts: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
+      currentBimAssessments.forEach(a => { if (a.writing_level) wCounts[a.writing_level]++; });
       setWritingData(
-        Object.entries(writingCounts)
+        Object.entries(wCounts)
           .filter(([, v]) => v > 0)
           .map(([key, value]) => ({
             name: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
@@ -105,13 +101,11 @@ const Dashboard: React.FC = () => {
           }))
       );
 
-      // Reading data
-      const readingCounts: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
-      assessments?.forEach(a => {
-        if (a.reading_level) readingCounts[a.reading_level]++;
-      });
+      // Reading distribution
+      const rCounts: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
+      currentBimAssessments.forEach(a => { if (a.reading_level) rCounts[a.reading_level]++; });
       setReadingData(
-        Object.entries(readingCounts)
+        Object.entries(rCounts)
           .filter(([, v]) => v > 0)
           .map(([key, value]) => ({
             name: READING_LEVELS[key as keyof typeof READING_LEVELS].label,
@@ -121,33 +115,31 @@ const Dashboard: React.FC = () => {
           }))
       );
 
-      // Evolution data across bimestres
-      const evoData = await Promise.all(['1', '2', '3', '4'].map(async (b) => {
-        let q = supabase.from('assessments').select('writing_level, reading_level').eq('bimestre', b as any);
-        if (studentIds.length > 0) q = q.in('student_id', studentIds);
-        const { data: bData } = await q;
-        const alfa = bData?.filter(a => a.writing_level === 'A').length || 0;
-        const total = bData?.length || 0;
+      // Evolution — computed from already-loaded allAssessments (no extra queries!)
+      const evo = (['1', '2', '3', '4'] as const).map(b => {
+        const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
+        const alfa = bData.filter(a => a.writing_level === 'A').length;
+        const total = bData.length;
         return {
           name: `${b}º Bim`,
           Alfabéticos: alfa,
           Total: total,
           Porcentagem: total > 0 ? Math.round((alfa / total) * 100) : 0,
         };
-      }));
-      setEvolutionData(evoData);
+      });
+      setEvolutionData(evo);
     } finally {
       setLoading(false);
     }
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload?.length) {
       return (
         <div className="bg-card border border-border rounded-xl p-3 shadow-card">
           <p className="font-display font-bold text-foreground">{payload[0].name}</p>
           <p className="text-muted-foreground text-sm">
-            {payload[0].value} alunos ({payload[0].payload.pct}%)
+            {payload[0].value} alunos ({payload[0].payload?.pct ?? 0}%)
           </p>
         </div>
       );
@@ -231,7 +223,6 @@ const Dashboard: React.FC = () => {
 
       {/* Charts row */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Writing levels donut */}
         <Card className="p-6 shadow-card">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-5 h-5 text-primary" />
@@ -245,9 +236,7 @@ const Dashboard: React.FC = () => {
               <ResponsiveContainer width="55%" height={200}>
                 <PieChart>
                   <Pie data={writingData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3}>
-                    {writingData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                    {writingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
@@ -271,7 +260,6 @@ const Dashboard: React.FC = () => {
           )}
         </Card>
 
-        {/* Reading levels donut */}
         <Card className="p-6 shadow-card">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-primary" />
@@ -285,9 +273,7 @@ const Dashboard: React.FC = () => {
               <ResponsiveContainer width="55%" height={200}>
                 <PieChart>
                   <Pie data={readingData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3}>
-                    {readingData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                    {readingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>

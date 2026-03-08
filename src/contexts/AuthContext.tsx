@@ -30,47 +30,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, name, role')
         .eq('user_id', userId)
-        .single();
-      if (!error && data) {
-        setProfile(data as Profile);
-      } else {
-        setProfile(null);
-      }
+        .maybeSingle();
+      setProfile(data as Profile | null);
     } catch {
       setProfile(null);
     }
   };
 
   useEffect(() => {
-    // Set up the auth state listener FIRST
+    // Listener registered FIRST — always
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      (_event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
+
         if (newSession?.user) {
-          await fetchProfile(newSession.user.id);
+          // Fire profile fetch without blocking loading state
+          fetchProfile(newSession.user.id).finally(() => setLoading(false));
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    // Then check for existing session
+    // Check existing session — if no session, unblock immediately
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      // onAuthStateChange will handle this, but set a fallback timeout
-      // in case the listener is slow
       if (!existingSession) {
         setLoading(false);
       }
+      // If session exists, onAuthStateChange will handle loading(false)
     });
 
-    // Safety fallback: never stay loading more than 5 seconds
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    // Hard safety timeout — never stay loading > 4s
+    const timeout = setTimeout(() => setLoading(false), 4000);
 
     return () => {
       subscription.unsubscribe();
@@ -84,14 +81,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
     setProfile(null);
     setUser(null);
     setSession(null);
+    await supabase.auth.signOut();
   };
 
   const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
-    const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
     if (error) throw error;
   };
 
