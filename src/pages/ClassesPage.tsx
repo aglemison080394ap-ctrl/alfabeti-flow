@@ -6,12 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Pencil, Trash2, School, Users } from 'lucide-react';
 
-const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '1º Ano EJA', '2º Ano EJA'];
+// Only 1º–5º Ano (Ensino Fundamental I)
+const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const ClassesPage: React.FC = () => {
@@ -23,18 +23,22 @@ const ClassesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
-  const [form, setForm] = useState({ grade_year: '', class_letter: '', teacher_id: '' });
+  const [form, setForm] = useState({
+    grade_year: '',
+    class_letter: '',
+    teacher_id: '',
+    coordinator_name: '',
+  });
 
   const fetchAll = async () => {
     const [{ data: classesData }, { data: teachersData }, { data: studentsData }] = await Promise.all([
       supabase.from('classes').select('*, teachers(name)').order('grade_year'),
       supabase.from('teachers').select('id, name').order('name'),
-      supabase.from('students').select('class_id'), // one query for all student counts
+      supabase.from('students').select('class_id'),
     ]);
     if (classesData) setClasses(classesData);
     if (teachersData) setTeachers(teachersData);
 
-    // Build counts map from single students query
     if (studentsData) {
       const counts: Record<string, number> = {};
       studentsData.forEach(s => {
@@ -49,7 +53,7 @@ const ClassesPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingClass(null);
-    setForm({ grade_year: '', class_letter: '', teacher_id: '' });
+    setForm({ grade_year: '', class_letter: '', teacher_id: '', coordinator_name: '' });
     setDialogOpen(true);
   };
 
@@ -59,6 +63,7 @@ const ClassesPage: React.FC = () => {
       grade_year: cls.grade_year,
       class_letter: cls.class_letter,
       teacher_id: cls.teacher_id || '',
+      coordinator_name: (cls as any).coordinator_name || '',
     });
     setDialogOpen(true);
   };
@@ -72,6 +77,7 @@ const ClassesPage: React.FC = () => {
       grade_year: form.grade_year,
       class_letter: form.class_letter,
       teacher_id: form.teacher_id || null,
+      coordinator_name: form.coordinator_name || null,
     };
 
     const { error } = editingClass
@@ -129,7 +135,7 @@ const ClassesPage: React.FC = () => {
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Ano Escolar *</Label>
+                  <Label>Série/Ano Escolar *</Label>
                   <Select value={form.grade_year} onValueChange={v => setForm(f => ({ ...f, grade_year: v }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o ano" />
@@ -161,6 +167,17 @@ const ClassesPage: React.FC = () => {
                       {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nome do(a) Coordenador(a)</Label>
+                  <Input
+                    value={form.coordinator_name}
+                    onChange={e => setForm(f => ({ ...f, coordinator_name: e.target.value }))}
+                    placeholder="Ex: Maria da Silva"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Aparecerá no cabeçalho do relatório dessa turma.
+                  </p>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -223,6 +240,12 @@ const ClassesPage: React.FC = () => {
                 <div className="mt-2 flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-muted-foreground" />
                   <span className="text-xs text-muted-foreground">Sem professor vinculado</span>
+                </div>
+              )}
+              {(cls as any).coordinator_name && (
+                <div className="mt-1 flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <span className="text-xs text-muted-foreground truncate">Coord: {(cls as any).coordinator_name}</span>
                 </div>
               )}
             </Card>

@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileText, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2 } from 'lucide-react';
+import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,17 +42,17 @@ function absenceTotal(assessMap: Record<string, any>, students: any[], b: string
   return sum || 0;
 }
 
-/* ── Donut component ──────────────────────────────────────────────── */
+/* ── Donut component (green theme for reports) ────────────────────── */
 const DonutSection: React.FC<{
   title: string; icon: React.ElementType; data: any[]; total: number;
 }> = ({ title, icon: Icon, data, total }) => {
   const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
     if (percent < 0.05) return null;
     const R = Math.PI / 180;
-    const r = innerRadius + (outerRadius - innerRadius) * 0.55;
+    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + r * Math.cos(-midAngle * R);
     const y = cy + r * Math.sin(-midAngle * R);
-    return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
+    return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
   };
   return (
     <div className="flex gap-3">
@@ -71,15 +71,15 @@ const DonutSection: React.FC<{
       </div>
       <div className="flex-1">
         <div className="flex items-center gap-1.5 mb-1">
-          <Icon className="w-4 h-4 text-primary" />
+          <Icon className="w-4 h-4 text-green-700" />
           <p className="text-sm font-bold text-gray-700">{title}</p>
         </div>
         {total > 0 ? (
           <>
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={165}>
               <PieChart>
                 <Pie data={data.filter(d => d.value > 0)} cx="50%" cy="50%"
-                  innerRadius={40} outerRadius={68}
+                  innerRadius={38} outerRadius={72}
                   dataKey="value" paddingAngle={2} labelLine={false} label={renderLabel}>
                   {data.filter(d => d.value > 0).map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
                 </Pie>
@@ -97,7 +97,7 @@ const DonutSection: React.FC<{
             </div>
           </>
         ) : (
-          <div className="h-32 flex items-center justify-center text-gray-400 text-xs">Sem dados</div>
+          <div className="h-36 flex items-center justify-center text-gray-400 text-xs">Sem dados</div>
         )}
       </div>
     </div>
@@ -109,25 +109,26 @@ const DonutSection: React.FC<{
 ══════════════════════════════════════════════════════════════════════ */
 const ReportsPage: React.FC = () => {
   const { toast } = useToast();
-  const tableRef    = useRef<HTMLDivElement>(null);
-  const dashRef     = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const dashRef  = useRef<HTMLDivElement>(null);
 
   const [classes, setClasses]       = useState<any[]>([]);
-  const [schoolInfo, setSchoolInfo] = useState({ name: 'E.M.E.F Roseli Paiva', city: 'Anajás-PA', coordinator: '' });
+  const [schoolInfo, setSchoolInfo] = useState({ name: 'E.M.E.F Roseli Paiva', city: 'Anajás-PA', coordinator: '', active_school_year: new Date().getFullYear() });
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading]       = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from('classes').select('*, teachers(name)').order('grade_year').then(({ data }) => {
       if (data) setClasses(data);
     });
-    supabase.from('school_info').select('name, city, coordinator').single().then(({ data }) => {
+    supabase.from('school_info').select('name, city, coordinator, active_school_year').single().then(({ data }) => {
       if (data) setSchoolInfo({
-        name:        data.name        || 'E.M.E.F Roseli Paiva',
-        city:        data.city        || 'Anajás-PA',
-        coordinator: (data as any).coordinator || '',
+        name:               (data as any).name             || 'E.M.E.F Roseli Paiva',
+        city:               (data as any).city             || 'Anajás-PA',
+        coordinator:        (data as any).coordinator      || '',
+        active_school_year: (data as any).active_school_year || new Date().getFullYear(),
       });
     });
   }, []);
@@ -148,14 +149,12 @@ const ReportsPage: React.FC = () => {
     const { data: allAssessments } = await supabase
       .from('assessments').select('*').in('student_id', studentIds);
 
-    // Map: student_id → bimestre → assessment
     const assessMap: Record<string, Record<string, any>> = {};
     allAssessments?.forEach(a => {
       if (!assessMap[a.student_id]) assessMap[a.student_id] = {};
       assessMap[a.student_id][a.bimestre] = a;
     });
 
-    // Per-bimestre stats
     const bimestreStats = (['1','2','3','4'] as const).map(b => {
       const bData = allAssessments?.filter(a => a.bimestre === b) || [];
       const total = bData.length;
@@ -188,23 +187,20 @@ const ReportsPage: React.FC = () => {
       'Leu Texto':  b.total > 0 ? Math.round((b.rC.LT / b.total) * 100) : 0,
     }));
 
+    // Coordinator: class-level overrides school-level
+    const coordinatorName = (classData as any)?.coordinator_name || schoolInfo.coordinator || '___________________';
+
     setReportData({
       classData, students: students || [], assessMap,
       bimestreStats, writingChartData, readingChartData,
       evolutionData, latestTotal: latestB.total, latestBimestre: latestB.bimestre,
+      coordinatorName,
     });
     setLoading(false);
   };
 
-  /* ── Print helpers ────────────────────────────────────────────── */
+  /* ── Print helper ─────────────────────────────────────────────── */
   const printSection = (sectionId: string) => {
-    // Temporarily mark the target section as active, then call window.print()
-    const all = document.querySelectorAll<HTMLElement>('.print-section');
-    all.forEach(el => el.setAttribute('data-print', 'false'));
-    const target = document.getElementById(sectionId);
-    if (target) target.setAttribute('data-print', 'true');
-
-    // Inject a print-specific style
     const style = document.createElement('style');
     style.id = '__print_override';
     style.innerHTML = `
@@ -213,7 +209,7 @@ const ReportsPage: React.FC = () => {
         #app-root { display: block !important; }
         .no-print { display: none !important; }
         .print-section { display: none !important; }
-        .print-section[data-print="true"] { display: block !important; }
+        #${sectionId} { display: block !important; }
         @page { size: A4 landscape; margin: 10mm; }
       }
     `;
@@ -222,89 +218,84 @@ const ReportsPage: React.FC = () => {
     document.head.removeChild(style);
   };
 
-  /* ── PDF Export (html2canvas + jsPDF) ────────────────────────── */
-  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+  /* ── JPG Export ───────────────────────────────────────────────── */
+  const handleDownloadJPG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
     if (!ref.current) return;
-    setGenerating(true);
+    setGenerating(filename);
     try {
       const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-      const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pdfW = pdf.internal.pageSize.getWidth();
-      const pdfH = (canvas.height * pdfW) / canvas.width;
-      const pageH = pdf.internal.pageSize.getHeight();
-      if (pdfH <= pageH) {
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
-      } else {
-        let pos = 0; let rem = pdfH; let first = true;
-        while (rem > 0) {
-          if (!first) pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, -pos, pdfW, pdfH);
-          pos += pageH; rem -= pageH; first = false;
-        }
-      }
-      pdf.save(filename);
-      toast({ title: 'PDF exportado com sucesso!' });
+      const canvas = await html2canvas(ref.current, {
+        scale: 2.5,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+      toast({ title: 'Imagem exportada com sucesso!' });
     } catch (e) {
       console.error(e);
-      toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
+      toast({ title: 'Erro ao exportar imagem', variant: 'destructive' });
     }
-    setGenerating(false);
+    setGenerating(null);
   };
 
-  /* ── Report header (shared) ───────────────────────────────────── */
-  const ReportHeader = () => (
-    <div className="px-6 py-4 border-b-4 border-green-800"
-      style={{ background: 'linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%)' }}>
-      <div className="flex items-center justify-between">
-        {/* Logo badge */}
-        <div className="w-16 h-16 rounded-xl bg-white/20 border-2 border-white/40 flex flex-col items-center justify-center shrink-0 text-center px-1">
-          <div className="text-white text-[7px] font-bold leading-tight">E.M.E.F</div>
-          <div className="text-green-200 text-[6px] leading-tight">ROSELI</div>
-          <div className="text-green-200 text-[6px] leading-tight">PAIVA</div>
-          <div className="text-green-300 text-[5px] leading-tight mt-0.5">Anajás-PA</div>
+  /* ── Report header (green — only for print sections) ─────────── */
+  const ReportHeader = () => {
+    const classCoordinator = reportData?.coordinatorName || schoolInfo.coordinator || '___________________';
+    return (
+      <div className="px-6 py-4 border-b-4 border-green-800"
+        style={{ background: 'linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%)' }}>
+        <div className="flex items-center justify-between">
+          {/* Logo badge */}
+          <div className="w-16 h-16 rounded-xl bg-white/20 border-2 border-white/40 flex flex-col items-center justify-center shrink-0 text-center px-1">
+            <div className="text-white text-[7px] font-bold leading-tight">E.M.E.F</div>
+            <div className="text-green-200 text-[6px] leading-tight">ROSELI</div>
+            <div className="text-green-200 text-[6px] leading-tight">PAIVA</div>
+            <div className="text-green-300 text-[5px] leading-tight mt-0.5">Anajás-PA</div>
+          </div>
+          <div className="text-center flex-1 px-4">
+            <p className="text-green-200 text-xs uppercase tracking-widest">SECRETARIA MUNICIPAL DE EDUCAÇÃO</p>
+            <h1 className="text-white font-bold text-xl leading-tight mt-0.5" style={{ fontFamily: 'Nunito, sans-serif' }}>{schoolInfo.name}</h1>
+            <p className="text-green-200 text-sm">{schoolInfo.city}</p>
+            <p className="text-white font-bold text-sm mt-1 uppercase tracking-wide">
+              PLANILHA DE RESULTADOS DA SONDAGEM
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-green-200 text-xs">ANO LETIVO</p>
+            <p className="text-white text-2xl font-bold" style={{ fontFamily: 'Nunito, sans-serif' }}>
+              {reportData?.classData?.school_year || schoolInfo.active_school_year}
+            </p>
+            <p className="text-green-200 text-xs mt-1">{new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
         </div>
-        <div className="text-center flex-1 px-4">
-          <p className="text-green-200 text-xs uppercase tracking-widest">SECRETARIA MUNICIPAL DE EDUCAÇÃO</p>
-          <h1 className="text-white font-display font-bold text-xl leading-tight mt-0.5">{schoolInfo.name}</h1>
-          <p className="text-green-200 text-sm">{schoolInfo.city}</p>
-          <p className="text-white font-bold text-sm mt-1 uppercase tracking-wide">
-            PLANILHA DE RESULTADOS DA SONDAGEM
-          </p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-green-200 text-xs">ANO LETIVO</p>
-          <p className="text-white text-2xl font-display font-bold">
-            {reportData?.classData?.school_year || new Date().getFullYear()}
-          </p>
-          <p className="text-green-200 text-xs mt-1">{new Date().toLocaleDateString('pt-BR')}</p>
+        {/* Meta row */}
+        <div className="mt-3 flex flex-wrap gap-4 bg-white/10 rounded-xl px-4 py-2 text-sm">
+          <div>
+            <span className="text-green-200 text-xs uppercase tracking-wide">Turma: </span>
+            <span className="text-white font-bold">
+              {reportData?.classData?.grade_year} {reportData?.classData?.class_letter}
+            </span>
+          </div>
+          <div>
+            <span className="text-green-200 text-xs uppercase tracking-wide">Professor(a): </span>
+            <span className="text-white font-bold">{reportData?.classData?.teachers?.name || '___________________'}</span>
+          </div>
+          <div>
+            <span className="text-green-200 text-xs uppercase tracking-wide">Coordenador(a): </span>
+            <span className="text-white font-bold">{classCoordinator}</span>
+          </div>
+          <div>
+            <span className="text-green-200 text-xs uppercase tracking-wide">Total de Alunos: </span>
+            <span className="text-white font-bold">{reportData?.students?.length}</span>
+          </div>
         </div>
       </div>
-      {/* Meta row */}
-      <div className="mt-3 flex flex-wrap gap-4 bg-white/10 rounded-xl px-4 py-2 text-sm">
-        <div>
-          <span className="text-green-200 text-xs uppercase tracking-wide">Turma: </span>
-          <span className="text-white font-bold">
-            {reportData?.classData?.grade_year} {reportData?.classData?.class_letter}
-          </span>
-        </div>
-        <div>
-          <span className="text-green-200 text-xs uppercase tracking-wide">Professor(a): </span>
-          <span className="text-white font-bold">{reportData?.classData?.teachers?.name || '___________________'}</span>
-        </div>
-        <div>
-          <span className="text-green-200 text-xs uppercase tracking-wide">Coordenador(a): </span>
-          <span className="text-white font-bold">{schoolInfo.coordinator || '___________________'}</span>
-        </div>
-        <div>
-          <span className="text-green-200 text-xs uppercase tracking-wide">Total de Alunos: </span>
-          <span className="text-white font-bold">{reportData?.students?.length}</span>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   /* ── JSX ─────────────────────────────────────────────────────── */
   return (
@@ -351,13 +342,16 @@ const ReportsPage: React.FC = () => {
             <div className="flex gap-2 items-center">
               <span className="text-xs text-muted-foreground font-medium">Planilha:</span>
               <Button variant="outline" onClick={() => printSection('print-table-section')} className="gap-2 h-9">
-                <Printer className="w-4 h-4" /><Table2 className="w-4 h-4" /> Imprimir Planilha
+                <Printer className="w-4 h-4" /><Table2 className="w-4 h-4" /> Imprimir
               </Button>
-              <Button variant="outline" disabled={generating}
-                onClick={() => handleDownloadPDF(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+              <Button variant="outline" disabled={!!generating}
+                onClick={() => handleDownloadJPG(tableRef,
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`)}
                 className="gap-2 h-9">
-                <FileText className="w-4 h-4" /> PDF Planilha
+                {generating === `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`
+                  ? <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  : <Download className="w-4 h-4" />}
+                JPG Planilha
               </Button>
             </div>
 
@@ -367,13 +361,16 @@ const ReportsPage: React.FC = () => {
             <div className="flex gap-2 items-center">
               <span className="text-xs text-muted-foreground font-medium">Gráficos:</span>
               <Button variant="outline" onClick={() => printSection('print-dashboard-section')} className="gap-2 h-9">
-                <Printer className="w-4 h-4" /><BarChart3 className="w-4 h-4" /> Imprimir Gráficos
+                <Printer className="w-4 h-4" /><BarChart3 className="w-4 h-4" /> Imprimir
               </Button>
-              <Button variant="outline" disabled={generating}
-                onClick={() => handleDownloadPDF(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+              <Button variant="outline" disabled={!!generating}
+                onClick={() => handleDownloadJPG(dashRef,
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`)}
                 className="gap-2 h-9">
-                <FileText className="w-4 h-4" /> PDF Gráficos
+                {generating === `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`
+                  ? <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  : <FileImage className="w-4 h-4" />}
+                JPG Gráficos
               </Button>
             </div>
           </div>
@@ -521,19 +518,19 @@ const ReportsPage: React.FC = () => {
                 />
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
-                    <TrendingUp className="w-4 h-4 text-primary" />
+                    <TrendingUp className="w-4 h-4 text-green-700" />
                     <p className="text-sm font-bold text-gray-700">Evolução da Alfabetização</p>
                   </div>
-                  <ResponsiveContainer width="100%" height={180}>
+                  <ResponsiveContainer width="100%" height={190}>
                     <LineChart data={reportData.evolutionData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="name" tick={{ fontSize: 9 }} />
                       <YAxis tick={{ fontSize: 9 }} unit="%" domain={[0, 100]} />
                       <Tooltip formatter={(v: any, n: any) => [`${v}%`, n]} contentStyle={{ fontSize: '10px', borderRadius: '6px' }} />
                       <Legend wrapperStyle={{ fontSize: '9px' }} />
-                      <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={2}
+                      <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={2.5}
                         dot={{ r: 4, fill: '#22c55e', stroke: '#fff', strokeWidth: 1 }} />
-                      <Line type="monotone" dataKey="Leu Texto"  stroke="#3b82f6" strokeWidth={2}
+                      <Line type="monotone" dataKey="Leu Texto"  stroke="#3b82f6" strokeWidth={2.5}
                         dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} />
                     </LineChart>
                   </ResponsiveContainer>

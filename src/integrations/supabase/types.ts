@@ -61,6 +61,7 @@ export type Database = {
       classes: {
         Row: {
           class_letter: string
+          coordinator_name: string | null
           created_at: string
           grade_year: string
           id: string
@@ -70,6 +71,7 @@ export type Database = {
         }
         Insert: {
           class_letter: string
+          coordinator_name?: string | null
           created_at?: string
           grade_year: string
           id?: string
@@ -79,6 +81,7 @@ export type Database = {
         }
         Update: {
           class_letter?: string
+          coordinator_name?: string | null
           created_at?: string
           grade_year?: string
           id?: string
@@ -125,6 +128,7 @@ export type Database = {
       }
       school_info: {
         Row: {
+          active_school_year: number | null
           address: string | null
           city: string | null
           coordinator: string | null
@@ -133,6 +137,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_school_year?: number | null
           address?: string | null
           city?: string | null
           coordinator?: string | null
@@ -141,6 +146,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_school_year?: number | null
           address?: string | null
           city?: string | null
           coordinator?: string | null
