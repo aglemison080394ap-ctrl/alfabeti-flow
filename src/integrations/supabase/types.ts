@@ -193,6 +193,7 @@ export type Database = {
       }
       teachers: {
         Row: {
+          coordinator_name: string | null
           created_at: string
           email: string | null
           id: string
@@ -201,6 +202,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          coordinator_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -209,6 +211,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          coordinator_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
