@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, loading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
