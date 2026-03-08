@@ -15,6 +15,7 @@ import StudentsPage from "@/pages/StudentsPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import TeacherProfilePage from "@/pages/TeacherProfilePage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();

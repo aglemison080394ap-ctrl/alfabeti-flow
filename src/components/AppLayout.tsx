@@ -4,19 +4,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   BookOpen, LayoutDashboard, Users, School, GraduationCap,
-  ClipboardList, BarChart3, Settings, LogOut, Menu, X, ChevronRight
+  ClipboardList, BarChart3, Settings, LogOut, Menu, ChevronRight, UserCog
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/', roles: ['admin', 'teacher'] },
-  { icon: Users, label: 'Professores', path: '/professores', roles: ['admin'] },
-  { icon: School, label: 'Turmas', path: '/turmas', roles: ['admin', 'teacher'] },
-  { icon: GraduationCap, label: 'Alunos', path: '/alunos', roles: ['admin', 'teacher'] },
-  { icon: ClipboardList, label: 'Sondagens', path: '/sondagens', roles: ['admin', 'teacher'] },
-  { icon: BarChart3, label: 'Relatórios', path: '/relatorios', roles: ['admin', 'teacher'] },
-  { icon: Settings, label: 'Configurações', path: '/configuracoes', roles: ['admin'] },
+  { icon: LayoutDashboard, label: 'Dashboard',     path: '/',              roles: ['admin', 'teacher'] },
+  { icon: Users,           label: 'Professores',   path: '/professores',   roles: ['admin'] },
+  { icon: School,          label: 'Turmas',        path: '/turmas',        roles: ['admin', 'teacher'] },
+  { icon: GraduationCap,   label: 'Alunos',        path: '/alunos',        roles: ['admin', 'teacher'] },
+  { icon: ClipboardList,   label: 'Sondagens',     path: '/sondagens',     roles: ['admin', 'teacher'] },
+  { icon: BarChart3,       label: 'Relatórios',    path: '/relatorios',    roles: ['admin', 'teacher'] },
+  { icon: UserCog,         label: 'Meu Perfil',    path: '/meu-perfil',    roles: ['teacher'] },
+  { icon: Settings,        label: 'Configurações', path: '/configuracoes', roles: ['admin'] },
 ];
 
 interface AppLayoutProps {
