@@ -16,10 +16,10 @@ const SettingsPage: React.FC = () => {
   const [schoolCity, setSchoolCity] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminPassword, setNewAdminPassword] = useState('');
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     supabase.from('school_info').select('*').single().then(({ data }) => {
@@ -45,46 +45,35 @@ const SettingsPage: React.FC = () => {
     setLoading(false);
   };
 
-  const handleCreateAdmin = async () => {
-    if (!newAdminEmail || !newAdminPassword || !newAdminName) {
+  const createUser = async (role: 'admin' | 'teacher') => {
+    if (!newEmail || !newPassword || !newName) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' });
       return;
     }
-    setCreatingAdmin(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: newAdminEmail,
-      password: newAdminPassword,
-      options: { data: { name: newAdminName, role: 'admin' } },
-    });
-    if (error) {
-      toast({ title: 'Erro ao criar administrador', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Administrador criado!', description: `${newAdminName} foi cadastrado como administrador.` });
-      setNewAdminEmail(''); setNewAdminName(''); setNewAdminPassword('');
+    if (newPassword.length < 6) {
+      toast({ title: 'Senha muito curta', description: 'Mínimo 6 caracteres', variant: 'destructive' });
+      return;
     }
-    setCreatingAdmin(false);
-  };
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke('create-user', {
+        body: { email: newEmail, password: newPassword, name: newName, role },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
 
-  const handleCreateTeacher = async () => {
-    if (!newAdminEmail || !newAdminPassword || !newAdminName) {
-      toast({ title: 'Preencha todos os campos', variant: 'destructive' });
-      return;
+      if (res.error || res.data?.error) {
+        const msg = res.data?.error || res.error?.message || 'Erro desconhecido';
+        toast({ title: 'Erro ao criar usuário', description: msg, variant: 'destructive' });
+      } else {
+        const label = role === 'admin' ? 'Administrador' : 'Professor';
+        toast({ title: `${label} criado!`, description: `${newName} foi cadastrado e pode fazer login.` });
+        setNewEmail(''); setNewName(''); setNewPassword('');
+      }
+    } catch (err) {
+      toast({ title: 'Erro inesperado', description: String(err), variant: 'destructive' });
     }
-    setCreatingAdmin(true);
-    const { error } = await supabase.auth.signUp({
-      email: newAdminEmail,
-      password: newAdminPassword,
-      options: { data: { name: newAdminName, role: 'teacher' } },
-    });
-    if (error) {
-      toast({ title: 'Erro ao criar usuário', description: error.message, variant: 'destructive' });
-    } else {
-      // Also add to teachers table
-      await supabase.from('teachers').insert({ name: newAdminName, email: newAdminEmail });
-      toast({ title: 'Professor criado!', description: `${newAdminName} foi cadastrado e pode fazer login.` });
-      setNewAdminEmail(''); setNewAdminName(''); setNewAdminPassword('');
-    }
-    setCreatingAdmin(false);
+    setCreatingUser(false);
   };
 
   return (
@@ -128,22 +117,22 @@ const SettingsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Nome completo</Label>
-            <Input value={newAdminName} onChange={e => setNewAdminName(e.target.value)} placeholder="Nome do usuário" />
+            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do usuário" />
           </div>
           <div className="space-y-2">
             <Label>E-mail</Label>
-            <Input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} placeholder="email@escola.com" />
+            <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@escola.com" />
           </div>
           <div className="space-y-2">
             <Label>Senha</Label>
-            <Input type="password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
           </div>
           <div className="flex gap-3">
-            <Button onClick={handleCreateTeacher} disabled={creatingAdmin} variant="outline" className="flex-1 gap-2">
-              <User className="w-4 h-4" /> Criar Professor
+            <Button onClick={() => createUser('teacher')} disabled={creatingUser} variant="outline" className="flex-1 gap-2">
+              <User className="w-4 h-4" /> {creatingUser ? 'Criando...' : 'Criar Professor'}
             </Button>
-            <Button onClick={handleCreateAdmin} disabled={creatingAdmin} className="flex-1 gap-2 gradient-primary text-primary-foreground rounded-xl">
-              <Shield className="w-4 h-4" /> Criar Admin
+            <Button onClick={() => createUser('admin')} disabled={creatingUser} className="flex-1 gap-2 gradient-primary text-primary-foreground rounded-xl">
+              <Shield className="w-4 h-4" /> {creatingUser ? 'Criando...' : 'Criar Admin'}
             </Button>
           </div>
         </div>
