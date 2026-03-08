@@ -1,0 +1,1 @@
+ALTER TABLE public.school_info ADD COLUMN IF NOT EXISTS coordinator text;

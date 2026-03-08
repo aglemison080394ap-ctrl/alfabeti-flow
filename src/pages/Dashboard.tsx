@@ -10,63 +10,114 @@ import {
 import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine } from 'lucide-react';
 
 const WRITING_LEVELS = {
-  PS: { label: 'Pré-silábico', color: '#ef4444', short: 'PS' },
-  S:  { label: 'Silábico',     color: '#f59e0b', short: 'S' },
-  SA: { label: 'Sil. Alfabético', color: '#3b82f6', short: 'SA' },
-  A:  { label: 'Alfabético',   color: '#22c55e', short: 'A' },
+  PS: { label: 'Pré-silábico',      color: '#ef4444', short: 'PS' },
+  S:  { label: 'Silábico',          color: '#f59e0b', short: 'S'  },
+  SA: { label: 'Sil. Alfabético',   color: '#3b82f6', short: 'SA' },
+  A:  { label: 'Alfabético',        color: '#22c55e', short: 'A'  },
 };
 
 const READING_LEVELS = {
-  NL: { label: 'Não Leu',    color: '#ef4444', short: 'NL' },
-  LP: { label: 'Leu Palavras', color: '#f59e0b', short: 'LP' },
-  LF: { label: 'Leu Frases', color: '#3b82f6', short: 'LF' },
-  LT: { label: 'Leu Texto',  color: '#22c55e', short: 'LT' },
+  NL: { label: 'Não Leu',       color: '#ef4444', short: 'NL' },
+  LP: { label: 'Leu Palavras',  color: '#f59e0b', short: 'LP' },
+  LF: { label: 'Leu Frases',    color: '#3b82f6', short: 'LF' },
+  LT: { label: 'Leu Texto',     color: '#22c55e', short: 'LT' },
 };
 
 const Dashboard: React.FC = () => {
-  const { profile } = useAuth();
-  const [classes, setClasses] = useState<any[]>([]);
+  const { profile, isAdmin } = useAuth();
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [teacherClassIds, setTeacherClassIds] = useState<string[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [stats, setStats] = useState({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: 0 });
   const [writingData, setWritingData] = useState<any[]>([]);
-  const [writingCounts, setWritingCounts] = useState<Record<string, number>>({ PS: 0, S: 0, SA: 0, A: 0 });
   const [readingData, setReadingData] = useState<any[]>([]);
-  const [readingCounts, setReadingCounts] = useState<Record<string, number>>({ NL: 0, LP: 0, LF: 0, LT: 0 });
   const [evolutionData, setEvolutionData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Build years list (current year ± 2)
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 1, currentYear, currentYear + 1].map(String);
+
+  // Load classes — admin gets all, teacher gets own
   useEffect(() => {
-    supabase
-      .from('classes')
-      .select('id, grade_year, class_letter')
-      .order('grade_year')
-      .then(({ data }) => { if (data) setClasses(data); });
-  }, []);
+    const loadClasses = async () => {
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('classes')
+          .select('id, grade_year, class_letter, school_year')
+          .order('grade_year');
+        if (data) setAllClasses(data);
+      } else {
+        // Find teacher record
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile?.user_id ?? '')
+          .maybeSingle();
+
+        if (teacherData) {
+          const { data } = await supabase
+            .from('classes')
+            .select('id, grade_year, class_letter, school_year')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setAllClasses(data);
+            setTeacherClassIds(data.map((c: any) => c.id));
+            // Auto-select first class for teachers
+            if (data.length > 0) setSelectedClass(data[0].id);
+          }
+        }
+      }
+    };
+    if (profile) loadClasses();
+  }, [profile, isAdmin]);
+
+  // Filter classes by selected year (admin only)
+  const visibleClasses = isAdmin
+    ? allClasses.filter(c => String(c.school_year) === selectedYear)
+    : allClasses;
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedClass, selectedBimestre, classes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClass, selectedBimestre, selectedYear, allClasses]);
 
   const fetchDashboardData = async () => {
+    if (allClasses.length === 0 && !isAdmin) return;
     setLoading(true);
     try {
-      let studentsQuery = supabase.from('students').select('id, class_id');
+      // Determine which class IDs to use
+      let classFilter: string[] | null = null;
       if (selectedClass !== 'all') {
-        studentsQuery = studentsQuery.eq('class_id', selectedClass);
+        classFilter = [selectedClass];
+      } else if (isAdmin && selectedYear) {
+        classFilter = allClasses
+          .filter(c => String(c.school_year) === selectedYear)
+          .map(c => c.id);
+      } else if (!isAdmin) {
+        classFilter = teacherClassIds;
+      }
+
+      let studentsQuery = supabase.from('students').select('id, class_id');
+      if (classFilter && classFilter.length > 0) {
+        studentsQuery = studentsQuery.in('class_id', classFilter);
       }
       const { data: students } = await studentsQuery;
       const studentIds = students?.map(s => s.id) ?? [];
       const totalStudents = studentIds.length;
 
+      const totalClasses = classFilter
+        ? classFilter.length
+        : allClasses.filter(c => String(c.school_year) === selectedYear).length;
+
       if (totalStudents === 0) {
-        setStats({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: classes.length });
-        setWritingData([]); setReadingData([]);
-        setWritingCounts({ PS: 0, S: 0, SA: 0, A: 0 });
-        setReadingCounts({ NL: 0, LP: 0, LF: 0, LT: 0 });
-        setEvolutionData(['1','2','3','4'].map(b => ({
-          name: `${b}º Bim`, Alfabético: 0, 'Leu Texto': 0
-        })));
+        setStats({ totalStudents: 0, assessed: 0, pending: 0, totalClasses });
+        setWritingData(Object.entries(WRITING_LEVELS).map(([k, v]) => ({ ...v, value: 0, pct: 0 })));
+        setReadingData(Object.entries(READING_LEVELS).map(([k, v]) => ({ ...v, value: 0, pct: 0 })));
+        setEvolutionData(['1','2','3','4'].map(b => ({ name: `${b}º Bim`, Alfabético: 0, 'Leu Texto': 0 })));
         setLoading(false);
         return;
       }
@@ -79,12 +130,11 @@ const Dashboard: React.FC = () => {
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
       const assessed = currentBim.length;
 
-      setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses: classes.length });
+      setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
-      // Writing counts
+      // Writing
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
-      setWritingCounts({ ...wC });
       setWritingData(
         Object.entries(wC).map(([key, value]) => ({
           name: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
@@ -95,10 +145,9 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Reading counts
+      // Reading
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
-      setReadingCounts({ ...rC });
       setReadingData(
         Object.entries(rC).map(([key, value]) => ({
           name: READING_LEVELS[key as keyof typeof READING_LEVELS].label,
@@ -109,16 +158,14 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution — line chart: Alfabético (Escrita) e Leu Texto (Leitura)
+      // Evolution across 4 bimestres
       const evo = (['1','2','3','4'] as const).map(b => {
         const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
         const total = bData.length;
-        const alfa = bData.filter(a => a.writing_level === 'A').length;
-        const lt = bData.filter(a => a.reading_level === 'LT').length;
         return {
           name: `${b}º Bim`,
-          'Alfabético': total > 0 ? Math.round((alfa / total) * 100) : 0,
-          'Leu Texto': total > 0 ? Math.round((lt / total) * 100) : 0,
+          'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length / total) * 100) : 0,
+          'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length  / total) * 100) : 0,
         };
       });
       setEvolutionData(evo);
@@ -127,24 +174,20 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // ── Donut Card ──────────────────────────────────────────────────────────────
   const DonutCard = ({
-    title, icon: Icon, data, counts, assessed, totalLabel
+    title, icon: Icon, data, assessed,
   }: {
-    title: string;
-    icon: React.ElementType;
-    data: any[];
-    counts: Record<string, number>;
-    assessed: number;
-    totalLabel: string;
+    title: string; icon: React.ElementType; data: any[]; assessed: number;
   }) => {
-    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-      if (percent < 0.06) return null;
+    const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+      if (percent < 0.05) return null;
       const RADIAN = Math.PI / 180;
-      const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
-      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+      const r = innerRadius + (outerRadius - innerRadius) * 0.55;
+      const x = cx + r * Math.cos(-midAngle * RADIAN);
+      const y = cy + r * Math.sin(-midAngle * RADIAN);
       return (
-        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">
           {`${Math.round(percent * 100)}%`}
         </text>
       );
@@ -159,44 +202,36 @@ const Dashboard: React.FC = () => {
             {selectedBimestre}º Bimestre
           </span>
         </div>
-
-        <div className="flex gap-4">
-          {/* Left side: stat cards */}
+        <div className="flex gap-4 items-center">
+          {/* Left: stat cards */}
           <div className="flex flex-col gap-2 w-36 shrink-0">
-            {/* Avaliados */}
             <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
-              <p className="text-lg font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{totalLabel}</p>
+              <p className="text-xl font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Avaliados</p>
             </div>
-            {/* Per-level counts */}
             {data.map(item => (
-              <div
-                key={item.short}
-                className="rounded-lg px-3 py-1.5 flex items-center justify-between"
-                style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}
-              >
+              <div key={item.short} className="rounded-lg px-3 py-1.5 flex items-center justify-between"
+                style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}>
                 <span className="text-xs font-bold" style={{ color: item.color }}>{item.short}</span>
                 <span className="text-sm font-display font-bold text-foreground">{loading ? '…' : item.value}</span>
               </div>
             ))}
           </div>
-
           {/* Right: Donut */}
-          <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="flex-1 flex flex-col items-center">
             {assessed > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={180}>
+                <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
                       data={data.filter(d => d.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      cx="50%" cy="50%"
+                      innerRadius={52}
+                      outerRadius={88}
                       dataKey="value"
                       paddingAngle={2}
                       labelLine={false}
-                      label={renderCustomLabel}
+                      label={renderLabel}
                     >
                       {data.filter(d => d.value > 0).map((entry: any, i: number) => (
                         <Cell key={i} fill={entry.color} />
@@ -213,18 +248,17 @@ const Dashboard: React.FC = () => {
                     />
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Legend */}
-                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
                   {data.map(item => (
                     <div key={item.short} className="flex items-center gap-1">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-[10px] text-muted-foreground">{item.short}</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-[10px] text-muted-foreground">{item.short} – {item.name}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="h-48 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+              <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
                 <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
                   <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
                 </div>
@@ -248,19 +282,36 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {/* Year filter — admin only */}
+          {isAdmin && (
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-32 bg-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map(y => (
+                  <SelectItem key={y} value={y}>Ano {y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Class filter */}
           <Select value={selectedClass} onValueChange={setSelectedClass}>
             <SelectTrigger className="w-48 bg-card">
-              <SelectValue placeholder="Todas as turmas" />
+              <SelectValue placeholder={isAdmin ? 'Escola toda' : 'Selecione a turma'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Escola toda</SelectItem>
-              {classes.map(c => (
+              {isAdmin && <SelectItem value="all">Escola toda</SelectItem>}
+              {visibleClasses.map(c => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.grade_year} {c.class_letter}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {/* Bimestre filter */}
           <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
             <SelectTrigger className="w-40 bg-card">
               <SelectValue />
@@ -277,10 +328,10 @@ const Dashboard: React.FC = () => {
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: Users, label: 'Total de Alunos', value: stats.totalStudents, color: 'text-primary', bg: 'bg-primary/10' },
-          { icon: ClipboardCheck, label: 'Avaliados', value: stats.assessed, color: 'text-success', bg: 'bg-success/10' },
-          { icon: Clock, label: 'Pendentes', value: stats.pending, color: 'text-warning', bg: 'bg-warning/10' },
-          { icon: School, label: 'Turmas', value: stats.totalClasses, color: 'text-accent', bg: 'bg-accent/10' },
+          { icon: Users,          label: 'Total de Alunos', value: stats.totalStudents, color: 'text-primary',     bg: 'bg-primary/10'     },
+          { icon: ClipboardCheck, label: 'Avaliados',        value: stats.assessed,      color: 'text-success',     bg: 'bg-success/10'     },
+          { icon: Clock,          label: 'Pendentes',        value: stats.pending,        color: 'text-warning',     bg: 'bg-warning/10'     },
+          { icon: School,         label: 'Turmas',           value: stats.totalClasses,   color: 'text-accent',      bg: 'bg-accent/10'      },
         ].map((stat) => (
           <Card key={stat.label} className="p-5 shadow-card hover:shadow-hover transition-shadow">
             <div className="flex items-start justify-between">
@@ -313,22 +364,8 @@ const Dashboard: React.FC = () => {
 
       {/* Donut Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <DonutCard
-          title="Níveis de Escrita"
-          icon={PenLine}
-          data={writingData}
-          counts={writingCounts}
-          assessed={stats.assessed}
-          totalLabel="Avaliados"
-        />
-        <DonutCard
-          title="Níveis de Leitura"
-          icon={BookOpen}
-          data={readingData}
-          counts={readingCounts}
-          assessed={stats.assessed}
-          totalLabel="Avaliados"
-        />
+        <DonutCard title="Níveis de Escrita" icon={PenLine}  data={writingData} assessed={stats.assessed} />
+        <DonutCard title="Níveis de Leitura" icon={BookOpen} data={readingData} assessed={stats.assessed} />
       </div>
 
       {/* Evolution Line Chart */}
@@ -342,11 +379,7 @@ const Dashboard: React.FC = () => {
           <LineChart data={evolutionData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-            <YAxis
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-              unit="%"
-              domain={[0, 100]}
-            />
+            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} unit="%" domain={[0, 100]} />
             <Tooltip
               formatter={(v: any, n: any) => [`${v}%`, n]}
               contentStyle={{
@@ -357,22 +390,10 @@ const Dashboard: React.FC = () => {
               }}
             />
             <Legend />
-            <Line
-              type="monotone"
-              dataKey="Alfabético"
-              stroke="#22c55e"
-              strokeWidth={3}
-              dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="Leu Texto"
-              stroke="#3b82f6"
-              strokeWidth={3}
-              dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7 }}
-            />
+            <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={3}
+              dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
+            <Line type="monotone" dataKey="Leu Texto"  stroke="#3b82f6" strokeWidth={3}
+              dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
