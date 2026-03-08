@@ -155,12 +155,12 @@ const ClassesPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Professor Responsável</Label>
-                  <Select value={form.teacher_id} onValueChange={v => setForm(f => ({ ...f, teacher_id: v }))}>
+                  <Select value={form.teacher_id || 'none'} onValueChange={v => setForm(f => ({ ...f, teacher_id: v === 'none' ? '' : v }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o professor" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem professor</SelectItem>
+                      <SelectItem value="none">Sem professor</SelectItem>
                       {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
