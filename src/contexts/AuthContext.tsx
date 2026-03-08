@@ -37,35 +37,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       if (!error && data) {
         setProfile(data as Profile);
+      } else {
+        setProfile(null);
       }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
+    } catch {
+      setProfile(null);
     }
   };
 
   useEffect(() => {
-    let initialized = false;
-
-    // Initialize from current session first (synchronous path)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (initialized) return; // already handled by onAuthStateChange
-      initialized = true;
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    // Then listen for future changes
+    // Set up the auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        initialized = true;
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+      async (_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        if (newSession?.user) {
+          await fetchProfile(newSession.user.id);
         } else {
           setProfile(null);
         }
@@ -73,7 +60,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      // onAuthStateChange will handle this, but set a fallback timeout
+      // in case the listener is slow
+      if (!existingSession) {
+        setLoading(false);
+      }
+    });
+
+    // Safety fallback: never stay loading more than 5 seconds
+    const timeout = setTimeout(() => setLoading(false), 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -84,9 +86,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setUser(null);
+    setSession(null);
   };
 
-  // Used after teacher-login edge function returns tokens
   const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
     const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
     if (error) throw error;
