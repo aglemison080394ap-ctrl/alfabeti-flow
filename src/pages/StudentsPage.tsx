@@ -14,7 +14,7 @@ import { Plus, Pencil, Trash2, GraduationCap, Upload, Search } from 'lucide-reac
 
 const StudentsPage: React.FC = () => {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile } = useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,16 +27,47 @@ const StudentsPage: React.FC = () => {
   const [bulkClassId, setBulkClassId] = useState('');
 
   const fetchAll = async () => {
+    if (!profile) return;
+
+    let classesQuery = supabase.from('classes').select('id, grade_year, class_letter').order('grade_year');
+    let studentsQuery = supabase.from('students').select('*, classes(grade_year, class_letter)').order('name');
+
+    // Teachers only see their own classes and students
+    if (!isAdmin) {
+      const { data: teacherData } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', profile.user_id)
+        .maybeSingle();
+
+      if (teacherData) {
+        classesQuery = classesQuery.eq('teacher_id', teacherData.id);
+        // Fetch teacher's class IDs first, then filter students
+        const { data: teacherClasses } = await classesQuery;
+        if (teacherClasses && teacherClasses.length > 0) {
+          setClasses(teacherClasses);
+          const classIds = teacherClasses.map(c => c.id);
+          const { data: studentsData } = await studentsQuery.in('class_id', classIds);
+          if (studentsData) setStudents(studentsData);
+        } else {
+          setClasses([]);
+          setStudents([]);
+        }
+        setLoading(false);
+        return;
+      }
+    }
+
     const [{ data: studentsData }, { data: classesData }] = await Promise.all([
-      supabase.from('students').select('*, classes(grade_year, class_letter)').order('name'),
-      supabase.from('classes').select('id, grade_year, class_letter').order('grade_year'),
+      studentsQuery,
+      classesQuery,
     ]);
     if (studentsData) setStudents(studentsData);
     if (classesData) setClasses(classesData);
     setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [profile]);
 
   const openCreate = () => {
     setEditingStudent(null);
