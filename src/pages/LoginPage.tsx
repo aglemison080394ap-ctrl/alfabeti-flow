@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, loading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -163,9 +164,16 @@ const LoginPage: React.FC = () => {
 
           <div className="mt-8 p-4 rounded-xl bg-muted border border-border">
             <p className="text-sm text-muted-foreground font-medium mb-2">💡 Primeiro acesso?</p>
-            <p className="text-xs text-muted-foreground">
-              Solicite suas credenciais ao administrador do sistema. O administrador irá criar sua conta e fornecer os dados de acesso.
+            <p className="text-xs text-muted-foreground mb-3">
+              Configure o sistema criando o administrador inicial, ou solicite suas credenciais ao administrador.
             </p>
+            <button
+              type="button"
+              onClick={() => navigate('/setup')}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              → Configurar primeiro acesso
+            </button>
           </div>
         </div>
       </div>
