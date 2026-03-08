@@ -16,7 +16,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const ClassesPage: React.FC = () => {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
@@ -31,8 +31,28 @@ const ClassesPage: React.FC = () => {
   });
 
   const fetchAll = async () => {
+    if (!profile) return;
+
+    let classesQuery = supabase.from('classes').select('*, teachers(name)').order('grade_year');
+
+    // Teachers only see their own classes
+    if (!isAdmin) {
+      const { data: teacherData } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', profile.user_id)
+        .maybeSingle();
+      if (teacherData) {
+        classesQuery = classesQuery.eq('teacher_id', teacherData.id);
+      } else {
+        setClasses([]);
+        setLoading(false);
+        return;
+      }
+    }
+
     const [{ data: classesData }, { data: teachersData }, { data: studentsData }] = await Promise.all([
-      supabase.from('classes').select('*, teachers(name)').order('grade_year'),
+      classesQuery,
       supabase.from('teachers').select('id, name').order('name'),
       supabase.from('students').select('class_id'),
     ]);
@@ -49,7 +69,7 @@ const ClassesPage: React.FC = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [profile]);
 
   const openCreate = () => {
     setEditingClass(null);
