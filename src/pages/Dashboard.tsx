@@ -288,9 +288,8 @@ const Dashboard: React.FC = () => {
   // Context label
   const contextLabel = (() => {
     if (isAdmin) {
-      const yearPart   = selectedYear === 'all' ? 'Escola Toda' : selectedYear;
-      const letterPart = selectedLetter === 'all' ? '' : ` · Turma ${selectedLetter}`;
-      return `${yearPart}${letterPart}`;
+      if (isOverallView) return 'Escola Toda';
+      return `${selectedYear} · Turma ${selectedLetter}`;
     }
     if (selectedClass === 'all') return 'Todas as Turmas';
     const c = allClasses.find(x => x.id === selectedClass);
@@ -300,81 +299,113 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">Dashboard Pedagógico</h1>
-          <p className="text-muted-foreground mt-0.5">
-            Bem-vindo(a), {profile?.name?.split(' ')[0]}! Aqui está o panorama atual.
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-foreground">Dashboard Pedagógico</h1>
+            <p className="text-muted-foreground mt-0.5">
+              Bem-vindo(a), {profile?.name?.split(' ')[0]}! Aqui está o panorama atual.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {/* ─── ADMIN: 3 dropdowns fixos lado a lado */}
-          {isAdmin && (
-            <>
+        {/* ─── Filter Bar ─── */}
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-3">
+            {/* LEFT: Série + Turma + Bimestre */}
+            <div className="flex flex-wrap items-center gap-3 flex-1">
               {/* 1º Filtro: Série/Ano */}
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-48 bg-background border border-input rounded-lg shadow-sm">
-                  <SelectValue placeholder="Geral (Escola Toda)" />
+              <Select
+                value={selectedYear}
+                onValueChange={v => { setSelectedYear(v); setIsOverallView(false); }}
+                disabled={isOverallView}
+              >
+                <SelectTrigger className="w-40 bg-background border border-input rounded-lg shadow-sm disabled:opacity-40">
+                  <SelectValue placeholder="Série/Ano" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">🏫 Geral (Escola Toda)</SelectItem>
                   {GRADE_YEARS.map(g => (
                     <SelectItem key={g} value={g}>{g}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              {/* 2º Filtro: Turma — sempre visível, desativado no modo Geral */}
+              {/* 2º Filtro: Turma */}
               <Select
                 value={selectedLetter}
-                onValueChange={setSelectedLetter}
-                disabled={selectedYear === 'all'}
+                onValueChange={v => { setSelectedLetter(v); setIsOverallView(false); }}
+                disabled={isOverallView}
               >
-                <SelectTrigger className="w-36 bg-background border border-input rounded-lg shadow-sm disabled:opacity-50">
+                <SelectTrigger className="w-32 bg-background border border-input rounded-lg shadow-sm disabled:opacity-40">
                   <SelectValue placeholder="Turma" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
                   {['A','B','C','D','E','F','G','H','I'].map(l => (
                     <SelectItem key={l} value={l}>Turma {l}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </>
-          )}
 
-          {/* ─── TEACHER: only their classes */}
-          {!isAdmin && allClasses.length > 0 && (
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-48 bg-background border border-input rounded-lg shadow-sm">
-                <SelectValue placeholder="Selecione a turma" />
+              {/* 3º Filtro: Bimestre — global */}
+              <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
+                <SelectTrigger className="w-40 bg-background border border-input rounded-lg shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['1','2','3','4'].map(b => (
+                    <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* RIGHT: Visão Geral */}
+            <div className="flex items-center gap-2 border-l border-border pl-3">
+              <Button
+                variant={isOverallView ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2 rounded-lg"
+                onClick={() => setIsOverallView(prev => !prev)}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Visão Geral da Escola
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── TEACHER filter bar ─── */}
+        {!isAdmin && (
+          <div className="flex flex-wrap items-center gap-3">
+            {allClasses.length > 0 && (
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="w-48 bg-background border border-input rounded-lg shadow-sm">
+                  <SelectValue placeholder="Selecione a turma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allClasses.length > 1 && (
+                    <SelectItem value="all">Todas as minhas turmas</SelectItem>
+                  )}
+                  {allClasses.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.grade_year} {c.class_letter}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
+              <SelectTrigger className="w-40 bg-background border border-input rounded-lg shadow-sm">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {allClasses.length > 1 && (
-                  <SelectItem value="all">Todas as minhas turmas</SelectItem>
-                )}
-                {allClasses.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.grade_year} {c.class_letter}
-                  </SelectItem>
+                {['1','2','3','4'].map(b => (
+                  <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
-
-          {/* 3º Filtro: Bimestre — sempre visível */}
-          <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
-            <SelectTrigger className="w-44 bg-background border border-input rounded-lg shadow-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {['1','2','3','4'].map(b => (
-                <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Context badge */}
