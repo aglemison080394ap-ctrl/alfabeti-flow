@@ -7,9 +7,10 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2, Download, FileDown } from 'lucide-react';
+import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ── Level config ─────────────────────────────────────────────────── */
 const WRITING_LEVELS: Record<string, { label: string; color: string; short: string }> = {
@@ -126,6 +127,7 @@ const DonutSection: React.FC<{
 ══════════════════════════════════════════════════════════════════════ */
 const ReportsPage: React.FC = () => {
   const { toast } = useToast();
+  const { isAdmin, profile } = useAuth();
   const tableRef = useRef<HTMLDivElement>(null);
   const dashRef  = useRef<HTMLDivElement>(null);
 
@@ -141,10 +143,36 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading]             = useState(false);
   const [generating, setGenerating]       = useState<string | null>(null);
 
+  // Load only teacher's own classes (or all for admin)
   useEffect(() => {
-    supabase.from('classes').select('*, teachers(name)').order('grade_year').then(({ data }) => {
-      if (data) setClasses(data);
-    });
+    if (!profile) return;
+    const loadClasses = async () => {
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('classes')
+          .select('*, teachers(name)')
+          .order('grade_year');
+        if (data) setClasses(data);
+      } else {
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
+        if (teacherData) {
+          const { data } = await supabase
+            .from('classes')
+            .select('*, teachers(name)')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setClasses(data);
+            if (data.length > 0) setSelectedClass(data[0].id);
+          }
+        }
+      }
+    };
+    loadClasses();
     supabase.from('school_info').select('name, city, coordinator, active_school_year').single().then(({ data }) => {
       if (data) setSchoolInfo({
         name:               (data as any).name              || 'E.M.E.F Roseli Paiva',
@@ -153,7 +181,8 @@ const ReportsPage: React.FC = () => {
         active_school_year: (data as any).active_school_year || new Date().getFullYear(),
       });
     });
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, isAdmin]);
 
   /* ── Generate ─────────────────────────────────────────────────── */
   const generateReport = async () => {
@@ -246,19 +275,26 @@ const ReportsPage: React.FC = () => {
   const captureElement = async (el: HTMLDivElement, scale = 3): Promise<HTMLCanvasElement> => {
     const html2canvas = (await import('html2canvas')).default;
 
-    // Save original styles
+    // Snapshot original inline styles
     const prevWidth    = el.style.width;
+    const prevMaxWidth = el.style.maxWidth;
     const prevOverflow = el.style.overflow;
     const prevPosition = el.style.position;
+    const prevTransform = el.style.transform;
 
-    // Fix element width so Recharts renders at exact pixel size
-    const fixedWidth = 1200;
-    el.style.width    = `${fixedWidth}px`;
-    el.style.overflow = 'visible';
-    el.style.position = 'relative';
+    // Lock to a fixed width so Recharts SVGs render at full size
+    const EXPORT_WIDTH = 1280;
+    el.style.width     = `${EXPORT_WIDTH}px`;
+    el.style.maxWidth  = 'none';
+    el.style.overflow  = 'visible';
+    el.style.position  = 'relative';
+    el.style.transform = 'none';
 
-    // Wait one tick for Recharts to re-render at new size
-    await new Promise(r => setTimeout(r, 400));
+    // Allow Recharts ResizableContainers to recalculate
+    await new Promise(r => setTimeout(r, 600));
+
+    const scrollW = el.scrollWidth;
+    const scrollH = el.scrollHeight;
 
     const canvas = await html2canvas(el, {
       scale,
@@ -266,26 +302,35 @@ const ReportsPage: React.FC = () => {
       useCORS: true,
       logging: false,
       allowTaint: false,
-      width: el.scrollWidth,
-      height: el.scrollHeight,
-      windowWidth: el.scrollWidth + 40,
-      windowHeight: el.scrollHeight + 40,
-      onclone: (doc) => {
-        // Force all SVG elements to have explicit width/height so they render correctly
-        doc.querySelectorAll('svg').forEach((svg: SVGElement) => {
-          const box = svg.getBoundingClientRect();
-          if (box.width > 0) {
-            svg.setAttribute('width',  String(box.width));
-            svg.setAttribute('height', String(box.height));
+      width:        scrollW,
+      height:       scrollH,
+      windowWidth:  scrollW + 60,
+      windowHeight: scrollH + 60,
+      x: 0,
+      y: 0,
+      onclone: (_doc: Document, clonedEl: HTMLElement) => {
+        // Force every SVG to declare explicit pixel dimensions so html2canvas
+        // doesn't collapse them to 0×0 (which caused "torn" charts)
+        clonedEl.querySelectorAll('svg').forEach((svg: SVGElement) => {
+          const rect = svg.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            svg.setAttribute('width',  String(Math.ceil(rect.width)));
+            svg.setAttribute('height', String(Math.ceil(rect.height)));
           }
+        });
+        // Remove any transforms/translate that could misalign layers
+        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(el => {
+          el.style.transform = 'none';
         });
       },
     });
 
     // Restore original styles
-    el.style.width    = prevWidth;
-    el.style.overflow = prevOverflow;
-    el.style.position = prevPosition;
+    el.style.width     = prevWidth;
+    el.style.maxWidth  = prevMaxWidth;
+    el.style.overflow  = prevOverflow;
+    el.style.position  = prevPosition;
+    el.style.transform = prevTransform;
 
     return canvas;
   };
@@ -313,7 +358,8 @@ const ReportsPage: React.FC = () => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const canvas   = await captureElement(ref.current, 2);
+      // Use scale 3 for HD — jsPDF compresses internally anyway
+      const canvas    = await captureElement(ref.current, 3);
       const { jsPDF } = await import('jspdf');
 
       const imgW  = canvas.width;
@@ -321,7 +367,7 @@ const ReportsPage: React.FC = () => {
       const ratio = imgH / imgW;
 
       // A4 landscape: 297 × 210 mm  |  portrait: 210 × 297 mm
-      const landscape = imgW >= imgH;
+      const landscape = ratio < 1;
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
 
@@ -329,41 +375,24 @@ const ReportsPage: React.FC = () => {
         orientation: landscape ? 'landscape' : 'portrait',
         unit: 'mm',
         format: 'a4',
+        compress: true,
       });
 
-      // Fit image inside page with margins
-      const margin   = 8; // mm
-      const maxW     = pdfW - margin * 2;
-      const maxH     = pdfH - margin * 2;
-      const drawW    = Math.min(maxW, maxH / ratio);
-      const drawH    = drawW * ratio;
-      const offsetX  = margin + (maxW - drawW) / 2;
-      const offsetY  = margin + (maxH - drawH) / 2;
+      const margin  = 6;
+      const maxW    = pdfW - margin * 2;
+      const maxH    = pdfH - margin * 2;
+      const drawW   = Math.min(maxW, maxH / ratio);
+      const drawH   = drawW * ratio;
+      const offsetX = margin + (maxW - drawW) / 2;
+      const offsetY = margin + (maxH - drawH) / 2;
 
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', offsetX, offsetY, drawW, drawH);
+      // Use PNG for pixel-perfect sharpness (no JPEG compression blur)
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
       toast({ title: 'PDF exportado com sucesso!' });
     } catch (e) {
       console.error(e);
       toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
-    }
-    setGenerating(null);
-  };
-
-  /* ── JPG Export (legacy, kept for backward compat) ───────────── */
-  const handleDownloadJPG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
-    if (!ref.current) return;
-    setGenerating(filename);
-    try {
-      const canvas = await captureElement(ref.current, 3);
-      const link   = document.createElement('a');
-      link.download = filename;
-      link.href     = canvas.toDataURL('image/jpeg', 0.97);
-      link.click();
-      toast({ title: 'Imagem exportada com sucesso!' });
-    } catch (e) {
-      console.error(e);
-      toast({ title: 'Erro ao exportar imagem', variant: 'destructive' });
     }
     setGenerating(null);
   };
