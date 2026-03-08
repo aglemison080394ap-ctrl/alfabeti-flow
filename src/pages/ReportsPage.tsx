@@ -127,6 +127,7 @@ const DonutSection: React.FC<{
 ══════════════════════════════════════════════════════════════════════ */
 const ReportsPage: React.FC = () => {
   const { toast } = useToast();
+  const { isAdmin, profile } = useAuth();
   const tableRef = useRef<HTMLDivElement>(null);
   const dashRef  = useRef<HTMLDivElement>(null);
 
@@ -142,10 +143,36 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading]             = useState(false);
   const [generating, setGenerating]       = useState<string | null>(null);
 
+  // Load only teacher's own classes (or all for admin)
   useEffect(() => {
-    supabase.from('classes').select('*, teachers(name)').order('grade_year').then(({ data }) => {
-      if (data) setClasses(data);
-    });
+    if (!profile) return;
+    const loadClasses = async () => {
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('classes')
+          .select('*, teachers(name)')
+          .order('grade_year');
+        if (data) setClasses(data);
+      } else {
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
+        if (teacherData) {
+          const { data } = await supabase
+            .from('classes')
+            .select('*, teachers(name)')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setClasses(data);
+            if (data.length > 0) setSelectedClass(data[0].id);
+          }
+        }
+      }
+    };
+    loadClasses();
     supabase.from('school_info').select('name, city, coordinator, active_school_year').single().then(({ data }) => {
       if (data) setSchoolInfo({
         name:               (data as any).name              || 'E.M.E.F Roseli Paiva',
@@ -154,7 +181,8 @@ const ReportsPage: React.FC = () => {
         active_school_year: (data as any).active_school_year || new Date().getFullYear(),
       });
     });
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, isAdmin]);
 
   /* ── Generate ─────────────────────────────────────────────────── */
   const generateReport = async () => {
