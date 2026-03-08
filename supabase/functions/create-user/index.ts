@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
     const callerClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
@@ -31,10 +31,27 @@ Deno.serve(async (req) => {
     const { data: isAdminData } = await callerClient.rpc('is_admin');
     if (!isAdminData) return new Response(JSON.stringify({ error: 'Forbidden: admin only' }), { status: 403, headers: corsHeaders });
 
-    const { email, password, name, role } = await req.json();
+    const { email: providedEmail, password, name, role } = await req.json();
 
-    if (!email || !password || !name || !role) {
+    if (!password || !name || !role) {
       return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400, headers: corsHeaders });
+    }
+
+    // For teachers: generate synthetic internal email if not provided
+    // For admins: email is required
+    let email = providedEmail;
+    if (role === 'teacher' && !email) {
+      const slug = name.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '.')
+        .replace(/\.+/g, '.')
+        .replace(/^\.|\.$/, '');
+      const uid = crypto.randomUUID().split('-')[0];
+      email = `${slug}.${uid}@professor.escola.app`;
+    }
+
+    if (!email) {
+      return new Response(JSON.stringify({ error: 'E-mail obrigatório para administradores' }), { status: 400, headers: corsHeaders });
     }
 
     // Create user with service role (won't affect current session)
@@ -47,7 +64,7 @@ Deno.serve(async (req) => {
 
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
 
-    // If teacher, also insert into teachers table
+    // If teacher, insert into teachers table with user_id and synthetic email
     if (role === 'teacher' && data.user) {
       await supabaseAdmin.from('teachers').insert({ name, email, user_id: data.user.id });
     }

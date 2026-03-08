@@ -4,30 +4,64 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BookOpen, Eye, EyeOff, GraduationCap, Lock, Mail } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, GraduationCap, Lock, Mail, User, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+type Tab = 'admin' | 'professor';
 
 const LoginPage: React.FC = () => {
-  const { signIn, user, loading } = useAuth();
+  const { signIn, user, loading, setSessionFromTokens } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [tab, setTab] = useState<Tab>('professor');
+
+  // Admin fields
   const [email, setEmail] = useState('');
+
+  // Shared
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   if (!loading && user) return <Navigate to="/" replace />;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
       toast({
         title: 'Erro ao entrar',
-        description: 'E-mail ou senha incorretos. Verifique suas credenciais.',
+        description: 'E-mail ou senha incorretos.',
         variant: 'destructive',
       });
+    }
+    setIsLoading(false);
+  };
+
+  const handleTeacherSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !password) {
+      toast({ title: 'Preencha todos os campos', variant: 'destructive' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await supabase.functions.invoke('teacher-login', {
+        body: { name: name.trim(), password },
+      });
+
+      if (res.error || res.data?.error) {
+        const msg = res.data?.error || res.error?.message || 'Erro ao entrar';
+        toast({ title: 'Erro ao entrar', description: msg, variant: 'destructive' });
+      } else {
+        const { access_token, refresh_token } = res.data;
+        await setSessionFromTokens(access_token, refresh_token);
+      }
+    } catch (err) {
+      toast({ title: 'Erro inesperado', description: String(err), variant: 'destructive' });
     }
     setIsLoading(false);
   };
@@ -36,7 +70,6 @@ const LoginPage: React.FC = () => {
     <div className="min-h-screen flex">
       {/* Left panel - branding */}
       <div className="hidden lg:flex lg:w-1/2 gradient-hero flex-col justify-between p-12 relative overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-primary-light blur-3xl" />
           <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-accent blur-3xl" />
@@ -103,69 +136,159 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-6">
             <h2 className="text-foreground font-display font-bold text-3xl mb-2">Bem-vindo!</h2>
-            <p className="text-muted-foreground">Entre com suas credenciais para acessar o sistema.</p>
+            <p className="text-muted-foreground">Selecione seu perfil para entrar.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground font-medium">E-mail</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-card border-border focus:ring-primary"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground font-medium">Senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-card border-border"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 gradient-primary text-primary-foreground font-display font-bold text-base rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-              disabled={isLoading}
+          {/* Tabs */}
+          <div className="flex rounded-xl border border-border bg-muted p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => setTab('professor')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'professor'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Entrando...
+              <GraduationCap className="w-4 h-4" />
+              Professor
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('admin')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'admin'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              Administrador
+            </button>
+          </div>
+
+          {/* Professor login */}
+          {tab === 'professor' && (
+            <form onSubmit={handleTeacherSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="teacher-name" className="text-foreground font-medium">Nome do Professor</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="teacher-name"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="pl-10 h-12 bg-card border-border"
+                    required
+                    autoFocus
+                  />
                 </div>
-              ) : 'Entrar no Sistema'}
-            </Button>
-          </form>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="teacher-password" className="text-foreground font-medium">Senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="teacher-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 h-12 bg-card border-border"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 gradient-primary text-primary-foreground font-display font-bold text-base rounded-xl shadow-lg hover:opacity-90 transition-opacity"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Entrando...
+                  </div>
+                ) : 'Entrar como Professor'}
+              </Button>
+            </form>
+          )}
+
+          {/* Admin login */}
+          {tab === 'admin' && (
+            <form onSubmit={handleAdminSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground font-medium">E-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="admin@escola.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-12 bg-card border-border"
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="admin-password" className="text-foreground font-medium">Senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="admin-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 h-12 bg-card border-border"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 gradient-primary text-primary-foreground font-display font-bold text-base rounded-xl shadow-lg hover:opacity-90 transition-opacity"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Entrando...
+                  </div>
+                ) : 'Entrar como Admin'}
+              </Button>
+            </form>
+          )}
 
           <div className="mt-8 p-4 rounded-xl bg-muted border border-border">
             <p className="text-sm text-muted-foreground font-medium mb-2">💡 Primeiro acesso?</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Configure o sistema criando o administrador inicial, ou solicite suas credenciais ao administrador.
+              Configure o sistema criando o administrador inicial.
             </p>
             <button
               type="button"

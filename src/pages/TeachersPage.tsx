@@ -14,7 +14,8 @@ const TeachersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
-  const [name, setName] = useState('');
+  const [form, setForm] = useState({ name: '', password: '' });
+  const [saving, setSaving] = useState(false);
 
   const fetchTeachers = async () => {
     const { data } = await supabase.from('teachers').select('*').order('name');
@@ -26,49 +27,72 @@ const TeachersPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingTeacher(null);
-    setName('');
+    setForm({ name: '', password: '' });
     setDialogOpen(true);
   };
 
   const openEdit = (teacher: any) => {
     setEditingTeacher(teacher);
-    setName(teacher.name);
+    setForm({ name: teacher.name, password: '' });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    if (!form.name.trim()) {
       toast({ title: 'Campo obrigatório', description: 'Informe o nome do professor.', variant: 'destructive' });
       return;
     }
 
+    setSaving(true);
+
     if (editingTeacher) {
+      // Only update the name
       const { error } = await supabase
         .from('teachers')
-        .update({ name })
+        .update({ name: form.name })
         .eq('id', editingTeacher.id);
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+        setSaving(false);
         return;
       }
-      toast({ title: 'Professor atualizado!', description: `${name} foi atualizado com sucesso.` });
+      toast({ title: 'Professor atualizado!' });
     } else {
-      const { error } = await supabase
-        .from('teachers')
-        .insert({ name });
-      if (error) {
-        toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      if (!form.password || form.password.length < 6) {
+        toast({ title: 'Senha obrigatória', description: 'Mínimo 6 caracteres.', variant: 'destructive' });
+        setSaving(false);
         return;
       }
-      toast({ title: 'Professor cadastrado!', description: `${name} foi adicionado com sucesso.` });
+
+      // Create via edge function (generates synthetic email + auth user)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await supabase.functions.invoke('create-user', {
+          body: { name: form.name, password: form.password, role: 'teacher' },
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        });
+
+        if (res.error || res.data?.error) {
+          const msg = res.data?.error || res.error?.message || 'Erro desconhecido';
+          toast({ title: 'Erro ao cadastrar', description: msg, variant: 'destructive' });
+          setSaving(false);
+          return;
+        }
+        toast({ title: 'Professor cadastrado!', description: `${form.name} pode fazer login com o nome e senha definidos.` });
+      } catch (err) {
+        toast({ title: 'Erro inesperado', description: String(err), variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
     }
 
+    setSaving(false);
     setDialogOpen(false);
     fetchTeachers();
   };
 
   const handleDelete = async (teacher: any) => {
-    if (!confirm(`Deseja excluir ${teacher.name}? Todas as turmas vinculadas serão desvinculadas.`)) return;
+    if (!confirm(`Deseja excluir ${teacher.name}? As turmas vinculadas serão desvinculadas.`)) return;
     const { error } = await supabase.from('teachers').delete().eq('id', teacher.id);
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
@@ -104,19 +128,32 @@ const TeachersPage: React.FC = () => {
               <div className="space-y-2">
                 <Label>Nome completo *</Label>
                 <Input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Ex: Maria Silva"
                   autoFocus
-                  onKeyDown={e => e.key === 'Enter' && handleSave()}
                 />
               </div>
+              {!editingTeacher && (
+                <div className="space-y-2">
+                  <Label>Senha de acesso *</Label>
+                  <Input
+                    type="password"
+                    value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    O professor usará o nome e esta senha para entrar no sistema.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} className="flex-1 gradient-primary text-primary-foreground">
-                  {editingTeacher ? 'Salvar' : 'Cadastrar'}
+                <Button onClick={handleSave} disabled={saving} className="flex-1 gradient-primary text-primary-foreground">
+                  {saving ? 'Salvando...' : editingTeacher ? 'Salvar' : 'Cadastrar'}
                 </Button>
               </div>
             </div>
@@ -146,6 +183,12 @@ const TeachersPage: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-display font-bold text-foreground truncate">{teacher.name}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    <div className={`w-2 h-2 rounded-full ${teacher.user_id ? 'bg-success' : 'bg-muted-foreground'}`} />
+                    <span className="text-xs text-muted-foreground">
+                      {teacher.user_id ? 'Com acesso ao sistema' : 'Sem acesso'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
