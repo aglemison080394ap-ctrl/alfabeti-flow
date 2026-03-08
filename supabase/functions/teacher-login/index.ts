@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     if (!authRes.ok || authData.error) {
       const msg = authData.error_description || authData.error || 'Senha incorreta';
       return new Response(JSON.stringify({ error: msg }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
