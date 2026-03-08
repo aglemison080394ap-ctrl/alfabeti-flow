@@ -242,31 +242,123 @@ const ReportsPage: React.FC = () => {
     document.head.removeChild(style);
   };
 
-  /* ── JPG Export (high quality) ────────────────────────────────── */
+  /* ── High-quality capture helper ─────────────────────────────── */
+  const captureElement = async (el: HTMLDivElement, scale = 3): Promise<HTMLCanvasElement> => {
+    const html2canvas = (await import('html2canvas')).default;
+
+    // Save original styles
+    const prevWidth    = el.style.width;
+    const prevOverflow = el.style.overflow;
+    const prevPosition = el.style.position;
+
+    // Fix element width so Recharts renders at exact pixel size
+    const fixedWidth = 1200;
+    el.style.width    = `${fixedWidth}px`;
+    el.style.overflow = 'visible';
+    el.style.position = 'relative';
+
+    // Wait one tick for Recharts to re-render at new size
+    await new Promise(r => setTimeout(r, 400));
+
+    const canvas = await html2canvas(el, {
+      scale,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      allowTaint: false,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
+      windowWidth: el.scrollWidth + 40,
+      windowHeight: el.scrollHeight + 40,
+      onclone: (doc) => {
+        // Force all SVG elements to have explicit width/height so they render correctly
+        doc.querySelectorAll('svg').forEach((svg: SVGElement) => {
+          const box = svg.getBoundingClientRect();
+          if (box.width > 0) {
+            svg.setAttribute('width',  String(box.width));
+            svg.setAttribute('height', String(box.height));
+          }
+        });
+      },
+    });
+
+    // Restore original styles
+    el.style.width    = prevWidth;
+    el.style.overflow = prevOverflow;
+    el.style.position = prevPosition;
+
+    return canvas;
+  };
+
+  /* ── PNG Export ───────────────────────────────────────────────── */
+  const handleDownloadPNG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+    if (!ref.current) return;
+    setGenerating(filename);
+    try {
+      const canvas = await captureElement(ref.current, 3);
+      const link   = document.createElement('a');
+      link.download = filename.replace(/\.(jpg|jpeg)$/i, '.png');
+      link.href     = canvas.toDataURL('image/png');
+      link.click();
+      toast({ title: 'PNG exportado com sucesso!' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
+    }
+    setGenerating(null);
+  };
+
+  /* ── PDF Export ───────────────────────────────────────────────── */
+  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+    if (!ref.current) return;
+    setGenerating(filename);
+    try {
+      const canvas   = await captureElement(ref.current, 2);
+      const { jsPDF } = await import('jspdf');
+
+      const imgW  = canvas.width;
+      const imgH  = canvas.height;
+      const ratio = imgH / imgW;
+
+      // A4 landscape: 297 × 210 mm  |  portrait: 210 × 297 mm
+      const landscape = imgW >= imgH;
+      const pdfW = landscape ? 297 : 210;
+      const pdfH = landscape ? 210 : 297;
+
+      const pdf = new jsPDF({
+        orientation: landscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Fit image inside page with margins
+      const margin   = 8; // mm
+      const maxW     = pdfW - margin * 2;
+      const maxH     = pdfH - margin * 2;
+      const drawW    = Math.min(maxW, maxH / ratio);
+      const drawH    = drawW * ratio;
+      const offsetX  = margin + (maxW - drawW) / 2;
+      const offsetY  = margin + (maxH - drawH) / 2;
+
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', offsetX, offsetY, drawW, drawH);
+      pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
+      toast({ title: 'PDF exportado com sucesso!' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
+    }
+    setGenerating(null);
+  };
+
+  /* ── JPG Export (legacy, kept for backward compat) ───────────── */
   const handleDownloadJPG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      // Temporarily expand for accurate render
-      const el = ref.current;
-      const prevOverflow = el.style.overflow;
-      el.style.overflow = 'visible';
-      const canvas = await html2canvas(el, {
-        scale: 3,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-        allowTaint: false,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-      });
-      el.style.overflow = prevOverflow;
-      const link = document.createElement('a');
+      const canvas = await captureElement(ref.current, 3);
+      const link   = document.createElement('a');
       link.download = filename;
-      link.href = canvas.toDataURL('image/jpeg', 0.97);
+      link.href     = canvas.toDataURL('image/jpeg', 0.97);
       link.click();
       toast({ title: 'Imagem exportada com sucesso!' });
     } catch (e) {
