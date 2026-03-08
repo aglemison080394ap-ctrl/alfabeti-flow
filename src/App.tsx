@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import SetupPage from "@/pages/SetupPage";
 import Dashboard from "@/pages/Dashboard";
 import TeachersPage from "@/pages/TeachersPage";
 import ClassesPage from "@/pages/ClassesPage";
