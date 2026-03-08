@@ -65,6 +65,11 @@ const App = () => (
                 <AppLayout><SettingsPage /></AppLayout>
               </ProtectedRoute>
             } />
+            <Route path="/meu-perfil" element={
+              <ProtectedRoute>
+                <AppLayout><TeacherProfilePage /></AppLayout>
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
