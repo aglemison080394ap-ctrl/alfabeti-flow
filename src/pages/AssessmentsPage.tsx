@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Search, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardList, Search, Save } from 'lucide-react';
 
 const WRITING_LEVELS = [
   { value: 'PS', label: 'PS — Pré-silábico', desc: 'Não estabelece relação letra-som', className: 'level-ps' },
@@ -28,6 +29,7 @@ const READING_LEVELS = [
 
 const AssessmentsPage: React.FC = () => {
   const { toast } = useToast();
+  const { isAdmin, profile } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<Record<string, any>>({});
@@ -37,13 +39,39 @@ const AssessmentsPage: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState<string | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
+  // Load only teacher's own classes (or all for admin)
   useEffect(() => {
-    supabase.from('classes').select('*, teachers(name)').order('grade_year').then(({ data }) => {
-      if (data) setClasses(data);
-    });
-  }, []);
+    if (!profile) return;
+    const loadClasses = async () => {
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('classes')
+          .select('*, teachers(name)')
+          .order('grade_year');
+        if (data) setClasses(data);
+      } else {
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
+        if (teacherData) {
+          const { data } = await supabase
+            .from('classes')
+            .select('*, teachers(name)')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setClasses(data);
+            if (data.length > 0 && !selectedClass) setSelectedClass(data[0].id);
+          }
+        }
+      }
+    };
+    loadClasses();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, isAdmin]);
 
   useEffect(() => {
     if (!selectedClass) return;

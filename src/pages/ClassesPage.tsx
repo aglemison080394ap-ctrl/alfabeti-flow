@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2, School, Users } from 'lucide-react';
 
 // Only 1º–5º Ano (Ensino Fundamental I)
 const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
-const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 
 const ClassesPage: React.FC = () => {
   const { toast } = useToast();
