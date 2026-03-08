@@ -5,22 +5,22 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp } from 'lucide-react';
+import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine } from 'lucide-react';
 
 const WRITING_LEVELS = {
-  PS: { label: 'Pré-silábico', color: '#ef4444' },
-  S: { label: 'Silábico', color: '#f59e0b' },
-  SA: { label: 'Silábico-Alfabético', color: '#3b82f6' },
-  A: { label: 'Alfabético', color: '#22c55e' },
+  PS: { label: 'Pré-silábico', color: '#ef4444', short: 'PS' },
+  S:  { label: 'Silábico',     color: '#f59e0b', short: 'S' },
+  SA: { label: 'Sil. Alfabético', color: '#3b82f6', short: 'SA' },
+  A:  { label: 'Alfabético',   color: '#22c55e', short: 'A' },
 };
 
 const READING_LEVELS = {
-  NL: { label: 'Não leu', color: '#ef4444' },
-  LP: { label: 'Leu palavras', color: '#f59e0b' },
-  LF: { label: 'Leu frase', color: '#3b82f6' },
-  LT: { label: 'Leu texto', color: '#22c55e' },
+  NL: { label: 'Não Leu',    color: '#ef4444', short: 'NL' },
+  LP: { label: 'Leu Palavras', color: '#f59e0b', short: 'LP' },
+  LF: { label: 'Leu Frases', color: '#3b82f6', short: 'LF' },
+  LT: { label: 'Leu Texto',  color: '#22c55e', short: 'LT' },
 };
 
 const Dashboard: React.FC = () => {
@@ -30,7 +30,9 @@ const Dashboard: React.FC = () => {
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
   const [stats, setStats] = useState({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: 0 });
   const [writingData, setWritingData] = useState<any[]>([]);
+  const [writingCounts, setWritingCounts] = useState<Record<string, number>>({ PS: 0, S: 0, SA: 0, A: 0 });
   const [readingData, setReadingData] = useState<any[]>([]);
+  const [readingCounts, setReadingCounts] = useState<Record<string, number>>({ NL: 0, LP: 0, LF: 0, LT: 0 });
   const [evolutionData, setEvolutionData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,12 +46,11 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedClass, selectedBimestre]);
+  }, [selectedClass, selectedBimestre, classes]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Single query for students filtered by class
       let studentsQuery = supabase.from('students').select('id, class_id');
       if (selectedClass !== 'all') {
         studentsQuery = studentsQuery.eq('class_id', selectedClass);
@@ -60,71 +61,64 @@ const Dashboard: React.FC = () => {
 
       if (totalStudents === 0) {
         setStats({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: classes.length });
-        setWritingData([]);
-        setReadingData([]);
-        setEvolutionData([{ name: '1º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
-          { name: '2º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
-          { name: '3º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 },
-          { name: '4º Bim', Alfabéticos: 0, Total: 0, Porcentagem: 0 }]);
+        setWritingData([]); setReadingData([]);
+        setWritingCounts({ PS: 0, S: 0, SA: 0, A: 0 });
+        setReadingCounts({ NL: 0, LP: 0, LF: 0, LT: 0 });
+        setEvolutionData(['1','2','3','4'].map(b => ({
+          name: `${b}º Bim`, Alfabético: 0, 'Leu Texto': 0
+        })));
         setLoading(false);
         return;
       }
 
-      // All assessments in one query (all bimestres at once)
       const { data: allAssessments } = await supabase
         .from('assessments')
         .select('student_id, bimestre, writing_level, reading_level')
-        .in('student_id', studentIds.slice(0, 500)); // safety limit
+        .in('student_id', studentIds.slice(0, 500));
 
-      // Filter for selected bimestre
-      const currentBimAssessments = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      const assessed = currentBimAssessments.length;
+      const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
+      const assessed = currentBim.length;
 
-      setStats({
-        totalStudents,
-        assessed,
-        pending: totalStudents - assessed,
-        totalClasses: classes.length,
-      });
+      setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses: classes.length });
 
-      // Writing distribution
-      const wCounts: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
-      currentBimAssessments.forEach(a => { if (a.writing_level) wCounts[a.writing_level]++; });
+      // Writing counts
+      const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
+      currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
+      setWritingCounts({ ...wC });
       setWritingData(
-        Object.entries(wCounts)
-          .filter(([, v]) => v > 0)
-          .map(([key, value]) => ({
-            name: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
-            value,
-            color: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].color,
-            pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
-          }))
+        Object.entries(wC).map(([key, value]) => ({
+          name: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
+          short: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].short,
+          value,
+          color: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].color,
+          pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
+        }))
       );
 
-      // Reading distribution
-      const rCounts: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
-      currentBimAssessments.forEach(a => { if (a.reading_level) rCounts[a.reading_level]++; });
+      // Reading counts
+      const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
+      currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
+      setReadingCounts({ ...rC });
       setReadingData(
-        Object.entries(rCounts)
-          .filter(([, v]) => v > 0)
-          .map(([key, value]) => ({
-            name: READING_LEVELS[key as keyof typeof READING_LEVELS].label,
-            value,
-            color: READING_LEVELS[key as keyof typeof READING_LEVELS].color,
-            pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
-          }))
+        Object.entries(rC).map(([key, value]) => ({
+          name: READING_LEVELS[key as keyof typeof READING_LEVELS].label,
+          short: READING_LEVELS[key as keyof typeof READING_LEVELS].short,
+          value,
+          color: READING_LEVELS[key as keyof typeof READING_LEVELS].color,
+          pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
+        }))
       );
 
-      // Evolution — computed from already-loaded allAssessments (no extra queries!)
-      const evo = (['1', '2', '3', '4'] as const).map(b => {
+      // Evolution — line chart: Alfabético (Escrita) e Leu Texto (Leitura)
+      const evo = (['1','2','3','4'] as const).map(b => {
         const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
-        const alfa = bData.filter(a => a.writing_level === 'A').length;
         const total = bData.length;
+        const alfa = bData.filter(a => a.writing_level === 'A').length;
+        const lt = bData.filter(a => a.reading_level === 'LT').length;
         return {
           name: `${b}º Bim`,
-          Alfabéticos: alfa,
-          Total: total,
-          Porcentagem: total > 0 ? Math.round((alfa / total) * 100) : 0,
+          'Alfabético': total > 0 ? Math.round((alfa / total) * 100) : 0,
+          'Leu Texto': total > 0 ? Math.round((lt / total) * 100) : 0,
         };
       });
       setEvolutionData(evo);
@@ -133,18 +127,114 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload?.length) {
+  const DonutCard = ({
+    title, icon: Icon, data, counts, assessed, totalLabel
+  }: {
+    title: string;
+    icon: React.ElementType;
+    data: any[];
+    counts: Record<string, number>;
+    assessed: number;
+    totalLabel: string;
+  }) => {
+    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+      if (percent < 0.06) return null;
+      const RADIAN = Math.PI / 180;
+      const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
+      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+      const y = cy + radius * Math.sin(-midAngle * RADIAN);
       return (
-        <div className="bg-card border border-border rounded-xl p-3 shadow-card">
-          <p className="font-display font-bold text-foreground">{payload[0].name}</p>
-          <p className="text-muted-foreground text-sm">
-            {payload[0].value} alunos ({payload[0].payload?.pct ?? 0}%)
-          </p>
-        </div>
+        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+          {`${Math.round(percent * 100)}%`}
+        </text>
       );
-    }
-    return null;
+    };
+
+    return (
+      <Card className="p-5 shadow-card">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon className="w-5 h-5 text-primary" />
+          <h3 className="font-display font-bold text-foreground">{title}</h3>
+          <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {selectedBimestre}º Bimestre
+          </span>
+        </div>
+
+        <div className="flex gap-4">
+          {/* Left side: stat cards */}
+          <div className="flex flex-col gap-2 w-36 shrink-0">
+            {/* Avaliados */}
+            <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
+              <p className="text-lg font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{totalLabel}</p>
+            </div>
+            {/* Per-level counts */}
+            {data.map(item => (
+              <div
+                key={item.short}
+                className="rounded-lg px-3 py-1.5 flex items-center justify-between"
+                style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}
+              >
+                <span className="text-xs font-bold" style={{ color: item.color }}>{item.short}</span>
+                <span className="text-sm font-display font-bold text-foreground">{loading ? '…' : item.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right: Donut */}
+          <div className="flex-1 flex flex-col items-center justify-center">
+            {assessed > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={data.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      dataKey="value"
+                      paddingAngle={2}
+                      labelLine={false}
+                      label={renderCustomLabel}
+                    >
+                      {data.filter(d => d.value > 0).map((entry: any, i: number) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: any, _n: any, p: any) => [`${v} alunos (${p.payload.pct}%)`, p.payload.name]}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '0.5rem',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Legend */}
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
+                  {data.map(item => (
+                    <div key={item.short} className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-[10px] text-muted-foreground">{item.short}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-48 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+                <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
+                  <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
+                </div>
+                <p>Sem dados</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
   };
 
   return (
@@ -176,7 +266,7 @@ const Dashboard: React.FC = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {['1', '2', '3', '4'].map(b => (
+              {['1','2','3','4'].map(b => (
                 <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
               ))}
             </SelectContent>
@@ -197,7 +287,7 @@ const Dashboard: React.FC = () => {
               <div>
                 <p className="text-muted-foreground text-sm font-medium">{stat.label}</p>
                 <p className={`text-3xl font-display font-bold mt-1 ${stat.color}`}>
-                  {loading ? '...' : stat.value}
+                  {loading ? '…' : stat.value}
                 </p>
               </div>
               <div className={`w-11 h-11 rounded-xl ${stat.bg} flex items-center justify-center`}>
@@ -221,105 +311,69 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Charts row */}
+      {/* Donut Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="p-6 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <BookOpen className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-bold text-foreground">Níveis de Escrita</h3>
-            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {selectedBimestre}º Bimestre
-            </span>
-          </div>
-          {writingData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="55%" height={200}>
-                <PieChart>
-                  <Pie data={writingData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3}>
-                    {writingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {writingData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-sm text-foreground truncate">{item.name}</span>
-                    </div>
-                    <span className="text-sm font-bold text-foreground ml-2">{item.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              Nenhuma sondagem registrada
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-6 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            <h3 className="font-display font-bold text-foreground">Níveis de Leitura</h3>
-            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {selectedBimestre}º Bimestre
-            </span>
-          </div>
-          {readingData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="55%" height={200}>
-                <PieChart>
-                  <Pie data={readingData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3}>
-                    {readingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {readingData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-sm text-foreground truncate">{item.name}</span>
-                    </div>
-                    <span className="text-sm font-bold text-foreground ml-2">{item.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              Nenhuma sondagem registrada
-            </div>
-          )}
-        </Card>
+        <DonutCard
+          title="Níveis de Escrita"
+          icon={PenLine}
+          data={writingData}
+          counts={writingCounts}
+          assessed={stats.assessed}
+          totalLabel="Avaliados"
+        />
+        <DonutCard
+          title="Níveis de Leitura"
+          icon={BookOpen}
+          data={readingData}
+          counts={readingCounts}
+          assessed={stats.assessed}
+          totalLabel="Avaliados"
+        />
       </div>
 
-      {/* Evolution chart */}
+      {/* Evolution Line Chart */}
       <Card className="p-6 shadow-card">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-primary" />
-          <h3 className="font-display font-bold text-foreground">Evolução da Alfabetização</h3>
-          <span className="text-xs text-muted-foreground ml-auto">Alunos no nível Alfabético por bimestre</span>
+          <h3 className="font-display font-bold text-foreground">Evolução da Alfabetização por Bimestre</h3>
+          <span className="text-xs text-muted-foreground ml-auto bg-muted px-2 py-0.5 rounded-full">% do total avaliado</span>
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={evolutionData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart data={evolutionData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+            <YAxis
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              unit="%"
+              domain={[0, 100]}
+            />
             <Tooltip
+              formatter={(v: any, n: any) => [`${v}%`, n]}
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',
                 borderRadius: '0.75rem',
+                fontSize: '12px',
               }}
             />
-            <Bar dataKey="Alfabéticos" fill="hsl(var(--success))" radius={[6, 6, 0, 0]} />
-            <Bar dataKey="Total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} opacity={0.4} />
-          </BarChart>
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="Alfabético"
+              stroke="#22c55e"
+              strokeWidth={3}
+              dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 7 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="Leu Texto"
+              stroke="#3b82f6"
+              strokeWidth={3}
+              dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 7 }}
+            />
+          </LineChart>
         </ResponsiveContainer>
       </Card>
     </div>
