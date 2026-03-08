@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2, Download } from 'lucide-react';
+import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, Table2, Download, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -242,31 +242,123 @@ const ReportsPage: React.FC = () => {
     document.head.removeChild(style);
   };
 
-  /* ── JPG Export (high quality) ────────────────────────────────── */
+  /* ── High-quality capture helper ─────────────────────────────── */
+  const captureElement = async (el: HTMLDivElement, scale = 3): Promise<HTMLCanvasElement> => {
+    const html2canvas = (await import('html2canvas')).default;
+
+    // Save original styles
+    const prevWidth    = el.style.width;
+    const prevOverflow = el.style.overflow;
+    const prevPosition = el.style.position;
+
+    // Fix element width so Recharts renders at exact pixel size
+    const fixedWidth = 1200;
+    el.style.width    = `${fixedWidth}px`;
+    el.style.overflow = 'visible';
+    el.style.position = 'relative';
+
+    // Wait one tick for Recharts to re-render at new size
+    await new Promise(r => setTimeout(r, 400));
+
+    const canvas = await html2canvas(el, {
+      scale,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      allowTaint: false,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
+      windowWidth: el.scrollWidth + 40,
+      windowHeight: el.scrollHeight + 40,
+      onclone: (doc) => {
+        // Force all SVG elements to have explicit width/height so they render correctly
+        doc.querySelectorAll('svg').forEach((svg: SVGElement) => {
+          const box = svg.getBoundingClientRect();
+          if (box.width > 0) {
+            svg.setAttribute('width',  String(box.width));
+            svg.setAttribute('height', String(box.height));
+          }
+        });
+      },
+    });
+
+    // Restore original styles
+    el.style.width    = prevWidth;
+    el.style.overflow = prevOverflow;
+    el.style.position = prevPosition;
+
+    return canvas;
+  };
+
+  /* ── PNG Export ───────────────────────────────────────────────── */
+  const handleDownloadPNG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+    if (!ref.current) return;
+    setGenerating(filename);
+    try {
+      const canvas = await captureElement(ref.current, 3);
+      const link   = document.createElement('a');
+      link.download = filename.replace(/\.(jpg|jpeg)$/i, '.png');
+      link.href     = canvas.toDataURL('image/png');
+      link.click();
+      toast({ title: 'PNG exportado com sucesso!' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
+    }
+    setGenerating(null);
+  };
+
+  /* ── PDF Export ───────────────────────────────────────────────── */
+  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+    if (!ref.current) return;
+    setGenerating(filename);
+    try {
+      const canvas   = await captureElement(ref.current, 2);
+      const { jsPDF } = await import('jspdf');
+
+      const imgW  = canvas.width;
+      const imgH  = canvas.height;
+      const ratio = imgH / imgW;
+
+      // A4 landscape: 297 × 210 mm  |  portrait: 210 × 297 mm
+      const landscape = imgW >= imgH;
+      const pdfW = landscape ? 297 : 210;
+      const pdfH = landscape ? 210 : 297;
+
+      const pdf = new jsPDF({
+        orientation: landscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Fit image inside page with margins
+      const margin   = 8; // mm
+      const maxW     = pdfW - margin * 2;
+      const maxH     = pdfH - margin * 2;
+      const drawW    = Math.min(maxW, maxH / ratio);
+      const drawH    = drawW * ratio;
+      const offsetX  = margin + (maxW - drawW) / 2;
+      const offsetY  = margin + (maxH - drawH) / 2;
+
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', offsetX, offsetY, drawW, drawH);
+      pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
+      toast({ title: 'PDF exportado com sucesso!' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
+    }
+    setGenerating(null);
+  };
+
+  /* ── JPG Export (legacy, kept for backward compat) ───────────── */
   const handleDownloadJPG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      // Temporarily expand for accurate render
-      const el = ref.current;
-      const prevOverflow = el.style.overflow;
-      el.style.overflow = 'visible';
-      const canvas = await html2canvas(el, {
-        scale: 3,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-        allowTaint: false,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-      });
-      el.style.overflow = prevOverflow;
-      const link = document.createElement('a');
+      const canvas = await captureElement(ref.current, 3);
+      const link   = document.createElement('a');
       link.download = filename;
-      link.href = canvas.toDataURL('image/jpeg', 0.97);
+      link.href     = canvas.toDataURL('image/jpeg', 0.97);
       link.click();
       toast({ title: 'Imagem exportada com sucesso!' });
     } catch (e) {
@@ -393,44 +485,66 @@ const ReportsPage: React.FC = () => {
           {/* ── Action buttons ── */}
           <div className="flex flex-wrap gap-3 no-print">
             {/* Table actions */}
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-muted-foreground font-medium">Planilha:</span>
-              <Button variant="outline" onClick={() => printSection('print-table-section')} className="gap-2 h-9">
-                <Printer className="w-4 h-4" /><Table2 className="w-4 h-4" /> Imprimir
+            <div className="flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border">
+              <span className="text-xs text-muted-foreground font-bold uppercase tracking-wide w-full mb-1">📋 Planilha</span>
+              <Button variant="outline" size="sm" onClick={() => printSection('print-table-section')} className="gap-1.5 h-8 text-xs">
+                <Printer className="w-3.5 h-3.5" /> Imprimir
               </Button>
               <Button
-                variant="outline"
+                variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadJPG(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`)}
-                className="gap-2 h-9"
+                onClick={() => handleDownloadPNG(tableRef,
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                className="gap-1.5 h-8 text-xs"
               >
-                {generating === `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`
-                  ? <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                  : <Download className="w-4 h-4" />}
-                JPG Planilha
+                {generating?.includes('planilha') && generating?.endsWith('.png')
+                  ? <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  : <FileImage className="w-3.5 h-3.5" />}
+                PNG
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                disabled={!!generating}
+                onClick={() => handleDownloadPDF(tableRef,
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
+              >
+                {generating?.includes('planilha') && generating?.endsWith('.pdf')
+                  ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                  : <FileDown className="w-3.5 h-3.5" />}
+                PDF
               </Button>
             </div>
 
-            <div className="w-px bg-border mx-1 self-stretch" />
-
             {/* Dashboard actions */}
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-muted-foreground font-medium">Gráficos:</span>
-              <Button variant="outline" onClick={() => printSection('print-dashboard-section')} className="gap-2 h-9">
-                <Printer className="w-4 h-4" /><BarChart3 className="w-4 h-4" /> Imprimir
+            <div className="flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border">
+              <span className="text-xs text-muted-foreground font-bold uppercase tracking-wide w-full mb-1">📊 Gráficos</span>
+              <Button variant="outline" size="sm" onClick={() => printSection('print-dashboard-section')} className="gap-1.5 h-8 text-xs">
+                <Printer className="w-3.5 h-3.5" /> Imprimir
               </Button>
               <Button
-                variant="outline"
+                variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadJPG(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`)}
-                className="gap-2 h-9"
+                onClick={() => handleDownloadPNG(dashRef,
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                className="gap-1.5 h-8 text-xs"
               >
-                {generating === `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.jpg`
-                  ? <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                  : <FileImage className="w-4 h-4" />}
-                JPG Gráficos
+                {generating?.includes('graficos') && generating?.endsWith('.png')
+                  ? <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  : <FileImage className="w-3.5 h-3.5" />}
+                PNG
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                disabled={!!generating}
+                onClick={() => handleDownloadPDF(dashRef,
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
+              >
+                {generating?.includes('graficos') && generating?.endsWith('.pdf')
+                  ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                  : <FileDown className="w-3.5 h-3.5" />}
+                PDF
               </Button>
             </div>
           </div>
