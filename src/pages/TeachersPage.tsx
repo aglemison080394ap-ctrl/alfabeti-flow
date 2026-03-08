@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, UserCheck, Mail } from 'lucide-react';
+import { Plus, Pencil, Trash2, UserCheck } from 'lucide-react';
 
 const TeachersPage: React.FC = () => {
   const { toast } = useToast();
@@ -14,7 +14,7 @@ const TeachersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [name, setName] = useState('');
 
   const fetchTeachers = async () => {
     const { data } = await supabase.from('teachers').select('*').order('name');
@@ -26,18 +26,18 @@ const TeachersPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingTeacher(null);
-    setForm({ name: '', email: '', password: '' });
+    setName('');
     setDialogOpen(true);
   };
 
   const openEdit = (teacher: any) => {
     setEditingTeacher(teacher);
-    setForm({ name: teacher.name, email: teacher.email || '', password: '' });
+    setName(teacher.name);
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
+    if (!name.trim()) {
       toast({ title: 'Campo obrigatório', description: 'Informe o nome do professor.', variant: 'destructive' });
       return;
     }
@@ -45,36 +45,22 @@ const TeachersPage: React.FC = () => {
     if (editingTeacher) {
       const { error } = await supabase
         .from('teachers')
-        .update({ name: form.name, email: form.email || null })
+        .update({ name })
         .eq('id', editingTeacher.id);
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
         return;
       }
-      toast({ title: 'Professor atualizado!', description: `${form.name} foi atualizado com sucesso.` });
+      toast({ title: 'Professor atualizado!', description: `${name} foi atualizado com sucesso.` });
     } else {
-      // Create auth user for teacher
-      let userId: string | null = null;
-      if (form.email && form.password) {
-        const { data: authData, error: authError } = await supabase.auth.admin
-          ? await (supabase.auth as any).signUp({
-            email: form.email,
-            password: form.password,
-            options: { data: { name: form.name, role: 'teacher' } }
-          })
-          : { data: null, error: new Error('No admin access') };
-
-        if (authData?.user) userId = authData.user.id;
-      }
-
       const { error } = await supabase
         .from('teachers')
-        .insert({ name: form.name, email: form.email || null, user_id: userId });
+        .insert({ name });
       if (error) {
         toast({ title: 'Erro', description: error.message, variant: 'destructive' });
         return;
       }
-      toast({ title: 'Professor cadastrado!', description: `${form.name} foi adicionado com sucesso.` });
+      toast({ title: 'Professor cadastrado!', description: `${name} foi adicionado com sucesso.` });
     }
 
     setDialogOpen(false);
@@ -108,7 +94,7 @@ const TeachersPage: React.FC = () => {
               <Plus className="w-4 h-4" /> Novo Professor
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle className="font-display font-bold">
                 {editingTeacher ? 'Editar Professor' : 'Novo Professor'}
@@ -118,34 +104,13 @@ const TeachersPage: React.FC = () => {
               <div className="space-y-2">
                 <Label>Nome completo *</Label>
                 <Input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  value={name}
+                  onChange={e => setName(e.target.value)}
                   placeholder="Ex: Maria Silva"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && handleSave()}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="professor@escola.com"
-                />
-              </div>
-              {!editingTeacher && (
-                <div className="space-y-2">
-                  <Label>Senha de acesso</Label>
-                  <Input
-                    type="password"
-                    value={form.password}
-                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Mínimo 6 caracteres"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Deixe em branco se não precisar de acesso ao sistema.
-                  </p>
-                </div>
-              )}
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                   Cancelar
@@ -161,8 +126,8 @@ const TeachersPage: React.FC = () => {
 
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => (
-            <Card key={i} className="p-5 animate-pulse h-28 bg-muted" />
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="p-5 animate-pulse h-24 bg-muted" />
           ))}
         </div>
       ) : teachers.length === 0 ? (
@@ -175,24 +140,12 @@ const TeachersPage: React.FC = () => {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teachers.map(teacher => (
             <Card key={teacher.id} className="p-5 shadow-card hover:shadow-hover transition-all group">
-              <div className="flex items-start gap-4">
+              <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-display font-bold text-lg flex-shrink-0">
                   {getInitials(teacher.name)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-display font-bold text-foreground truncate">{teacher.name}</h3>
-                  {teacher.email && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Mail className="w-3 h-3 text-muted-foreground" />
-                      <p className="text-muted-foreground text-xs truncate">{teacher.email}</p>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1 mt-2">
-                    <div className={`w-2 h-2 rounded-full ${teacher.user_id ? 'bg-success' : 'bg-muted-foreground'}`} />
-                    <span className="text-xs text-muted-foreground">
-                      {teacher.user_id ? 'Com acesso ao sistema' : 'Sem acesso ao sistema'}
-                    </span>
-                  </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
