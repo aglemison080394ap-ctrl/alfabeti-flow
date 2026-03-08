@@ -10,63 +10,32 @@ import {
 import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine } from 'lucide-react';
 
 const WRITING_LEVELS = {
-  PS: { label: 'Pré-silábico',      color: '#ef4444', short: 'PS' },
-  S:  { label: 'Silábico',          color: '#f59e0b', short: 'S'  },
-  SA: { label: 'Sil. Alfabético',   color: '#3b82f6', short: 'SA' },
-  A:  { label: 'Alfabético',        color: '#22c55e', short: 'A'  },
+  PS: { label: 'Pré-silábico',    color: '#ef4444', short: 'PS' },
+  S:  { label: 'Silábico',        color: '#f59e0b', short: 'S'  },
+  SA: { label: 'Sil. Alfabético', color: '#3b82f6', short: 'SA' },
+  A:  { label: 'Alfabético',      color: '#22c55e', short: 'A'  },
 };
 
 const READING_LEVELS = {
-  NL: { label: 'Não Leu',       color: '#ef4444', short: 'NL' },
-  LP: { label: 'Leu Palavras',  color: '#f59e0b', short: 'LP' },
-  LF: { label: 'Leu Frases',    color: '#3b82f6', short: 'LF' },
-  LT: { label: 'Leu Texto',     color: '#22c55e', short: 'LT' },
+  NL: { label: 'Não Leu',      color: '#ef4444', short: 'NL' },
+  LP: { label: 'Leu Palavras', color: '#f59e0b', short: 'LP' },
+  LF: { label: 'Leu Frases',   color: '#3b82f6', short: 'LF' },
+  LT: { label: 'Leu Texto',    color: '#22c55e', short: 'LT' },
 };
-
-// Only 1º-5º Ano as grade filter options
-const GRADE_OPTIONS = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 
 const Dashboard: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const [allClasses, setAllClasses] = useState<any[]>([]);
-  const [teacherClassIds, setTeacherClassIds] = useState<string[]>([]);
 
-  // Admin filters
-  const [selectedGrade, setSelectedGrade] = useState<string>('all');
-  const [selectedLetter, setSelectedLetter] = useState<string>('all');
-  const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>('');
-  const [activeSchoolYear, setActiveSchoolYear] = useState<number>(new Date().getFullYear());
-
-  // Shared filters
-  const [selectedClass, setSelectedClass] = useState<string>('all');
+  // Single class filter — 'all' = escola toda
+  const [selectedClass, setSelectedClass]       = useState<string>('all');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
 
-  const [stats, setStats] = useState({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: 0 });
+  const [stats, setStats]             = useState({ totalStudents: 0, assessed: 0, pending: 0, totalClasses: 0 });
   const [writingData, setWritingData] = useState<any[]>([]);
   const [readingData, setReadingData] = useState<any[]>([]);
   const [evolutionData, setEvolutionData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Build years list (active ± 2)
-  const years = [
-    activeSchoolYear - 1,
-    activeSchoolYear,
-    activeSchoolYear + 1,
-    activeSchoolYear + 2,
-  ].map(String);
-
-  // Load school info to get active_school_year
-  useEffect(() => {
-    supabase
-      .from('school_info')
-      .select('active_school_year')
-      .single()
-      .then(({ data }) => {
-        const y = (data as any)?.active_school_year || new Date().getFullYear();
-        setActiveSchoolYear(y);
-        setSelectedSchoolYear(String(y));
-      });
-  }, []);
+  const [loading, setLoading]         = useState(true);
 
   // Load classes — admin gets all, teacher gets own
   useEffect(() => {
@@ -84,7 +53,6 @@ const Dashboard: React.FC = () => {
           .select('id')
           .eq('user_id', profile.user_id)
           .maybeSingle();
-
         if (teacherData) {
           const { data } = await supabase
             .from('classes')
@@ -93,7 +61,6 @@ const Dashboard: React.FC = () => {
             .order('grade_year');
           if (data) {
             setAllClasses(data);
-            setTeacherClassIds(data.map((c: any) => c.id));
             if (data.length > 0) setSelectedClass(data[0].id);
           }
         }
@@ -102,53 +69,20 @@ const Dashboard: React.FC = () => {
     loadClasses();
   }, [profile, isAdmin]);
 
-  // Available letters for the selected grade+year (admin only)
-  const availableLetters = isAdmin
-    ? [...new Set(
-        allClasses
-          .filter(c =>
-            String(c.school_year) === selectedSchoolYear &&
-            (selectedGrade === 'all' || c.grade_year === selectedGrade)
-          )
-          .map(c => c.class_letter)
-      )].sort()
-    : [];
-
-  // Filtered visible classes for the class selector (admin)
-  const visibleClasses = isAdmin
-    ? allClasses.filter(c => {
-        const yearMatch = String(c.school_year) === selectedSchoolYear;
-        const gradeMatch = selectedGrade === 'all' || c.grade_year === selectedGrade;
-        const letterMatch = selectedLetter === 'all' || c.class_letter === selectedLetter;
-        return yearMatch && gradeMatch && letterMatch;
-      })
-    : allClasses;
-
   useEffect(() => {
-    if (!selectedSchoolYear) return;
     fetchDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClass, selectedBimestre, selectedSchoolYear, selectedGrade, selectedLetter, allClasses]);
+  }, [selectedClass, selectedBimestre, allClasses]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
       // Determine class IDs to query
       let classFilter: string[] | null = null;
-
       if (selectedClass !== 'all') {
         classFilter = [selectedClass];
-      } else if (isAdmin) {
-        classFilter = allClasses
-          .filter(c => {
-            const yearMatch = String(c.school_year) === selectedSchoolYear;
-            const gradeMatch = selectedGrade === 'all' || c.grade_year === selectedGrade;
-            const letterMatch = selectedLetter === 'all' || c.class_letter === selectedLetter;
-            return yearMatch && gradeMatch && letterMatch;
-          })
-          .map(c => c.id);
       } else {
-        classFilter = teacherClassIds;
+        classFilter = allClasses.map(c => c.id);
       }
 
       let studentsQuery = supabase.from('students').select('id, class_id');
@@ -156,9 +90,9 @@ const Dashboard: React.FC = () => {
         studentsQuery = studentsQuery.in('class_id', classFilter);
       }
       const { data: students } = await studentsQuery;
-      const studentIds = students?.map(s => s.id) ?? [];
+      const studentIds  = students?.map(s => s.id) ?? [];
       const totalStudents = studentIds.length;
-      const totalClasses = classFilter ? classFilter.length : 0;
+      const totalClasses  = classFilter ? classFilter.length : 0;
 
       if (totalStudents === 0) {
         setStats({ totalStudents: 0, assessed: 0, pending: 0, totalClasses });
@@ -175,33 +109,33 @@ const Dashboard: React.FC = () => {
         .in('student_id', studentIds.slice(0, 500));
 
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      const assessed = currentBim.length;
+      const assessed   = currentBim.length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
-      // Writing
+      // Writing counts
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
       setWritingData(
         Object.entries(wC).map(([key, value]) => ({
-          name: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
+          name:  WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
           short: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].short,
           value,
           color: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].color,
-          pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
+          pct:   assessed > 0 ? Math.round((value / assessed) * 100) : 0,
         }))
       );
 
-      // Reading
+      // Reading counts
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
       setReadingData(
         Object.entries(rC).map(([key, value]) => ({
-          name: READING_LEVELS[key as keyof typeof READING_LEVELS].label,
+          name:  READING_LEVELS[key as keyof typeof READING_LEVELS].label,
           short: READING_LEVELS[key as keyof typeof READING_LEVELS].short,
           value,
           color: READING_LEVELS[key as keyof typeof READING_LEVELS].color,
-          pct: assessed > 0 ? Math.round((value / assessed) * 100) : 0,
+          pct:   assessed > 0 ? Math.round((value / assessed) * 100) : 0,
         }))
       );
 
@@ -221,7 +155,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // ── Donut Card ──────────────────────────────────────────────────────────────
+  // ── Donut Card ─────────────────────────────────────────────────────────────
   const DonutCard = ({
     title, icon: Icon, data, assessed,
   }: {
@@ -230,7 +164,6 @@ const Dashboard: React.FC = () => {
     const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
       if (percent < 0.05) return null;
       const RADIAN = Math.PI / 180;
-      // Place label at the center of the ring thickness
       const r = innerRadius + (outerRadius - innerRadius) * 0.5;
       const x = cx + r * Math.cos(-midAngle * RADIAN);
       const y = cy + r * Math.sin(-midAngle * RADIAN);
@@ -265,17 +198,17 @@ const Dashboard: React.FC = () => {
               </div>
             ))}
           </div>
-          {/* Right: Donut — fat ring (innerRadius=45, outerRadius=92) */}
+          {/* Right: fat donut (innerRadius=48, outerRadius=95) */}
           <div className="flex-1 flex flex-col items-center">
             {assessed > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={210}>
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie
                       data={data.filter(d => d.value > 0)}
                       cx="50%" cy="50%"
-                      innerRadius={45}
-                      outerRadius={92}
+                      innerRadius={48}
+                      outerRadius={95}
                       dataKey="value"
                       paddingAngle={2}
                       labelLine={false}
@@ -319,6 +252,13 @@ const Dashboard: React.FC = () => {
     );
   };
 
+  // Label for the selected class
+  const selectedClassLabel = (() => {
+    if (selectedClass === 'all') return 'Escola Toda';
+    const c = allClasses.find(x => x.id === selectedClass);
+    return c ? `${c.grade_year} ${c.class_letter}` : '';
+  })();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -329,67 +269,26 @@ const Dashboard: React.FC = () => {
             Bem-vindo(a), {profile?.name?.split(' ')[0]}! Aqui está o panorama atual.
           </p>
         </div>
+
         <div className="flex flex-wrap gap-3">
-
-          {/* ─── ADMIN FILTERS ─────────────────────────────── */}
+          {/* ─── ADMIN: single class selector (all classes + "escola toda") */}
           {isAdmin && (
-            <>
-              {/* Ano Letivo */}
-              <Select value={selectedSchoolYear} onValueChange={v => { setSelectedSchoolYear(v); setSelectedClass('all'); }}>
-                <SelectTrigger className="w-32 bg-card">
-                  <SelectValue placeholder="Ano Letivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map(y => (
-                    <SelectItem key={y} value={y}>Ano {y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Série/Ano Escolar */}
-              <Select value={selectedGrade} onValueChange={v => { setSelectedGrade(v); setSelectedLetter('all'); setSelectedClass('all'); }}>
-                <SelectTrigger className="w-36 bg-card">
-                  <SelectValue placeholder="Série/Ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Séries</SelectItem>
-                  {GRADE_OPTIONS.map(g => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Turma (letter) */}
-              <Select value={selectedLetter} onValueChange={v => { setSelectedLetter(v); setSelectedClass('all'); }}>
-                <SelectTrigger className="w-28 bg-card">
-                  <SelectValue placeholder="Turma" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {availableLetters.map(l => (
-                    <SelectItem key={l} value={l}>Turma {l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Geral / specific class */}
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-44 bg-card">
-                  <SelectValue placeholder="Geral" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">🏫 Escola toda (Geral)</SelectItem>
-                  {visibleClasses.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.grade_year} {c.class_letter}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="w-52 bg-card">
+                <SelectValue placeholder="🏫 Escola Toda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">🏫 Escola Toda (Geral)</SelectItem>
+                {allClasses.map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.grade_year} {c.class_letter}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
-          {/* ─── TEACHER FILTERS (only their classes) ─────── */}
+          {/* ─── TEACHER: only their classes */}
           {!isAdmin && allClasses.length > 0 && (
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger className="w-48 bg-card">
@@ -405,7 +304,7 @@ const Dashboard: React.FC = () => {
             </Select>
           )}
 
-          {/* Bimestre filter — shared */}
+          {/* Bimestre — shared */}
           <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
             <SelectTrigger className="w-40 bg-card">
               <SelectValue />
@@ -417,6 +316,13 @@ const Dashboard: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Context badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full border border-border">
+          Exibindo: <strong className="text-foreground">{selectedClassLabel}</strong> · {selectedBimestre}º Bimestre
+        </span>
       </div>
 
       {/* Stats cards */}

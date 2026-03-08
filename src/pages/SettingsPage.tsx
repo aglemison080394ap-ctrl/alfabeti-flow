@@ -4,28 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Save, School, Shield, CalendarDays } from 'lucide-react';
 
-const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(String);
-
 const SettingsPage: React.FC = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
-  const [schoolName, setSchoolName] = useState('');
-  const [schoolAddress, setSchoolAddress] = useState('');
-  const [schoolCity, setSchoolCity] = useState('');
+  const [schoolName, setSchoolName]               = useState('');
+  const [schoolAddress, setSchoolAddress]         = useState('');
+  const [schoolCity, setSchoolCity]               = useState('');
   const [schoolCoordinator, setSchoolCoordinator] = useState('');
-  const [activeSchoolYear, setActiveSchoolYear] = useState<string>(String(currentYear));
-  const [schoolId, setSchoolId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminName, setAdminName] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [activeSchoolYear, setActiveSchoolYear]   = useState<string>(String(new Date().getFullYear()));
+  const [schoolId, setSchoolId]                   = useState('');
+  const [loading, setLoading]                     = useState(false);
+  const [adminEmail, setAdminEmail]               = useState('');
+  const [adminName, setAdminName]                 = useState('');
+  const [adminPassword, setAdminPassword]         = useState('');
+  const [creatingAdmin, setCreatingAdmin]         = useState(false);
 
   useEffect(() => {
     supabase.from('school_info').select('*').single().then(({ data }) => {
@@ -35,19 +31,24 @@ const SettingsPage: React.FC = () => {
         setSchoolAddress(data.address || '');
         setSchoolCity(data.city || '');
         setSchoolCoordinator((data as any).coordinator || '');
-        setActiveSchoolYear(String((data as any).active_school_year || currentYear));
+        setActiveSchoolYear(String((data as any).active_school_year || new Date().getFullYear()));
       }
     });
   }, []);
 
   const handleSaveSchool = async () => {
+    const yearNum = parseInt(activeSchoolYear);
+    if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      toast({ title: 'Ano letivo inválido', description: 'Informe um ano válido (ex: 2026)', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     const payload = {
-      name: schoolName,
-      address: schoolAddress,
-      city: schoolCity,
-      coordinator: schoolCoordinator,
-      active_school_year: parseInt(activeSchoolYear),
+      name:               schoolName,
+      address:            schoolAddress,
+      city:               schoolCity,
+      coordinator:        schoolCoordinator,
+      active_school_year: yearNum,
     };
     const { error } = schoolId
       ? await supabase.from('school_info').update(payload).eq('id', schoolId)
@@ -76,7 +77,6 @@ const SettingsPage: React.FC = () => {
         body: { email: adminEmail, password: adminPassword, name: adminName, role: 'admin' },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
-
       if (res.error || res.data?.error) {
         const msg = res.data?.error || res.error?.message || 'Erro desconhecido';
         toast({ title: 'Erro ao criar administrador', description: msg, variant: 'destructive' });
@@ -108,17 +108,7 @@ const SettingsPage: React.FC = () => {
             <Label>Nome da Escola</Label>
             <Input value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Ex: E.M.E.F Roseli Paiva" />
           </div>
-          <div className="space-y-2">
-            <Label>Coordenador(a) Pedagógico(a) Geral</Label>
-            <Input
-              value={schoolCoordinator}
-              onChange={e => setSchoolCoordinator(e.target.value)}
-              placeholder="Nome do(a) coordenador(a) geral"
-            />
-            <p className="text-xs text-muted-foreground">
-              Usado como padrão quando a turma não define seu próprio coordenador.
-            </p>
-          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Endereço</Label>
@@ -129,37 +119,38 @@ const SettingsPage: React.FC = () => {
               <Input value={schoolCity} onChange={e => setSchoolCity(e.target.value)} placeholder="Ex: Anajás - PA" />
             </div>
           </div>
-          <Button onClick={handleSaveSchool} disabled={loading} className="gap-2 gradient-primary text-primary-foreground rounded-xl">
-            <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Dados'}
-          </Button>
-        </div>
-      </Card>
 
-      {/* Active School Year */}
-      <Card className="p-6 shadow-card">
-        <div className="flex items-center gap-2 mb-5">
-          <CalendarDays className="w-5 h-5 text-primary" />
-          <h2 className="font-display font-bold text-foreground">Ano Letivo Vigente</h2>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          Define o ano letivo padrão exibido no dashboard e nos relatórios. Altere ao iniciar um novo ano escolar.
-        </p>
-        <div className="flex gap-3 items-end">
-          <div className="space-y-2 flex-1">
-            <Label>Ano Letivo</Label>
-            <Select value={activeSchoolYear} onValueChange={setActiveSchoolYear}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {YEAR_OPTIONS.map(y => (
-                  <SelectItem key={y} value={y}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-2">
+            <Label>Coordenador(a) Pedagógico(a) — padrão geral</Label>
+            <Input
+              value={schoolCoordinator}
+              onChange={e => setSchoolCoordinator(e.target.value)}
+              placeholder="Digite o nome do(a) coordenador(a)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Usado como padrão nos relatórios. Pode ser substituído pelo coordenador definido em cada turma.
+            </p>
           </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-primary" />
+              Ano Letivo Vigente
+            </Label>
+            <Input
+              value={activeSchoolYear}
+              onChange={e => setActiveSchoolYear(e.target.value)}
+              placeholder="Ex: 2026"
+              className="w-32"
+              maxLength={4}
+            />
+            <p className="text-xs text-muted-foreground">
+              Informe o ano letivo atual (ex: 2026). Aparece nos cabeçalhos dos relatórios.
+            </p>
+          </div>
+
           <Button onClick={handleSaveSchool} disabled={loading} className="gap-2 gradient-primary text-primary-foreground rounded-xl">
-            <Save className="w-4 h-4" /> Salvar
+            <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Configurações'}
           </Button>
         </div>
       </Card>
