@@ -25,59 +25,10 @@ const SetupPage: React.FC = () => {
         navigate('/login', { replace: true });
         return;
       }
-      setAdminExists(false);
       setChecking(false);
     };
     check();
   }, [navigate]);
-
-  const handleSetup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password) {
-      toast({ title: 'Preencha todos os campos', variant: 'destructive' });
-      return;
-    }
-    if (password.length < 6) {
-      toast({ title: 'Senha muito curta', description: 'Mínimo 6 caracteres', variant: 'destructive' });
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name, role: 'admin' } },
-    });
-    if (error) {
-      toast({ title: 'Erro ao criar administrador', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Administrador criado!', description: 'Faça login com as credenciais cadastradas.' });
-      navigate('/login');
-    }
-    setLoading(false);
-  };
-
-  if (checking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (adminExists) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="p-8 max-w-sm w-full text-center space-y-4 shadow-card">
-          <Shield className="w-10 h-10 text-primary mx-auto" />
-          <h1 className="text-xl font-display font-bold text-foreground">Sistema já configurado</h1>
-          <p className="text-muted-foreground text-sm">Um administrador já foi cadastrado. Faça login para acessar o sistema.</p>
-          <Button className="w-full gradient-primary text-primary-foreground rounded-xl" onClick={() => navigate('/login')}>
-            Ir para o Login
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
