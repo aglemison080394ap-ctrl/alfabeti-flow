@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import schoolLogo from '@/assets/school-logo.jpeg';
+import schoolLogo from '@/assets/school-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -387,19 +387,20 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── PDF Export ───────────────────────────────────────────────── */
-  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+  // isSpreadsheet=true → A4 retrato | false → A4 paisagem
+  const handleDownloadPDF = async (
+    ref: React.RefObject<HTMLDivElement>,
+    filename: string,
+    isSpreadsheet = false,
+  ) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
       const canvas    = await captureElement(ref.current);
       const { jsPDF } = await import('jspdf');
 
-      const imgW  = canvas.width;
-      const imgH  = canvas.height;
-      const ratio = imgH / imgW;
-
-      // A4: landscape 297×210mm / portrait 210×297mm
-      const landscape = ratio < 1;
+      // Force orientation: spreadsheet=portrait, charts=landscape
+      const landscape = !isSpreadsheet;
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
 
@@ -407,18 +408,18 @@ const ReportsPage: React.FC = () => {
         orientation: landscape ? 'landscape' : 'portrait',
         unit: 'mm',
         format: 'a4',
-        compress: false,   // no compression → maximum sharpness
+        compress: false,
       });
 
-      const margin  = 5;
+      const margin  = 6;
       const maxW    = pdfW - margin * 2;
       const maxH    = pdfH - margin * 2;
-      const drawW   = Math.min(maxW, maxH / ratio);
-      const drawH   = drawW * ratio;
+      const imgRatio = canvas.height / canvas.width;
+      const drawW   = Math.min(maxW, maxH / imgRatio);
+      const drawH   = drawW * imgRatio;
       const offsetX = margin + (maxW - drawW) / 2;
       const offsetY = margin + (maxH - drawH) / 2;
 
-      // PNG for lossless sharpness
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
       toast({ title: '✅ PDF exportado em alta qualidade!' });
@@ -475,17 +476,15 @@ const ReportsPage: React.FC = () => {
           alignItems: 'center',
           gap: 20,
         }}>
-          {/* School Logo */}
+          {/* School Logo — PNG sem fundo */}
           <img
             src={schoolLogo}
             alt="Logo E.M.E.F Roseli Paiva"
             style={{
-              width: 80, height: 80,
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '3px solid rgba(255,255,255,0.6)',
-              background: '#fff',
+              width: 96, height: 96,
+              objectFit: 'contain',
               flexShrink: 0,
+              filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
             }}
           />
 
@@ -781,7 +780,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, true)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.pdf')
@@ -813,7 +812,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, false)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.pdf')
