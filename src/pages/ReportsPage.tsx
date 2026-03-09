@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import schoolLogo from '@/assets/school-logo.jpeg';
+import schoolLogo from '@/assets/school-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
