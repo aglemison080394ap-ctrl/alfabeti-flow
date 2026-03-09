@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ type Tab = 'admin' | 'professor';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, loading, setSessionFromTokens } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('professor');
 
@@ -285,19 +284,6 @@ const LoginPage: React.FC = () => {
             </form>
           )}
 
-          <div className="mt-8 p-4 rounded-xl bg-muted border border-border">
-            <p className="text-sm text-muted-foreground font-medium mb-2">💡 Primeiro acesso?</p>
-            <p className="text-xs text-muted-foreground mb-3">
-              Configure o sistema criando o administrador inicial.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/setup')}
-              className="text-xs text-primary hover:underline font-medium"
-            >
-              → Configurar primeiro acesso
-            </button>
-          </div>
         </div>
       </div>
     </div>
