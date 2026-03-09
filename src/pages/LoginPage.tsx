@@ -12,6 +12,7 @@ type Tab = 'admin' | 'professor';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, loading, setSessionFromTokens } = useAuth();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('professor');
 
   // Admin fields
