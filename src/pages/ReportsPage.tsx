@@ -227,15 +227,15 @@ const ReportsPage: React.FC = () => {
 
     const bimestreStats = (['1','2','3','4'] as const).map(b => {
       const bData = finalAssessments.filter(a => a.bimestre === b);
-      // assessed = alunos com registro nesse bimestre (inclui "não avaliado")
-      const assessed = bData.length;
+      // assessed = alunos COM nível de escrita OU leitura preenchido (faltosos não contam)
+      const assessed = bData.filter(a => a.writing_level || a.reading_level).length;
       const wC = { PS: 0, S: 0, SA: 0, A: 0 };
       const rC = { NL: 0, LP: 0, LF: 0, LT: 0 };
       bData.forEach(a => {
         if (a.writing_level) wC[a.writing_level as keyof typeof wC]++;
         if (a.reading_level) rC[a.reading_level as keyof typeof rC]++;
       });
-      // total = todos os alunos da turma (inclui os não avaliados)
+      // total = todos os alunos da turma
       return { bimestre: b, total: totalStudents, assessed, wC, rC };
     });
 
