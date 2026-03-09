@@ -398,7 +398,7 @@ const ReportsPage: React.FC = () => {
 
   /* ── Green table header ────────────────────────────────────────── */
   const TableHeader = () => {
-    const coordinatorName = reportData?.coordinatorName || schoolInfo.coordinator || '___________________';
+    const coordinatorName = reportData?.coordinatorName || '___________________';
     return (
       <div className="px-6 py-4 border-b-4 border-green-800"
         style={{ background: 'linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%)' }}>
