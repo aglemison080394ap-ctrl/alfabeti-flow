@@ -387,19 +387,20 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── PDF Export ───────────────────────────────────────────────── */
-  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+  // isSpreadsheet=true → A4 retrato | false → A4 paisagem
+  const handleDownloadPDF = async (
+    ref: React.RefObject<HTMLDivElement>,
+    filename: string,
+    isSpreadsheet = false,
+  ) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
       const canvas    = await captureElement(ref.current);
       const { jsPDF } = await import('jspdf');
 
-      const imgW  = canvas.width;
-      const imgH  = canvas.height;
-      const ratio = imgH / imgW;
-
-      // A4: landscape 297×210mm / portrait 210×297mm
-      const landscape = ratio < 1;
+      // Force orientation: spreadsheet=portrait, charts=landscape
+      const landscape = !isSpreadsheet;
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
 
@@ -407,18 +408,18 @@ const ReportsPage: React.FC = () => {
         orientation: landscape ? 'landscape' : 'portrait',
         unit: 'mm',
         format: 'a4',
-        compress: false,   // no compression → maximum sharpness
+        compress: false,
       });
 
-      const margin  = 5;
+      const margin  = 6;
       const maxW    = pdfW - margin * 2;
       const maxH    = pdfH - margin * 2;
-      const drawW   = Math.min(maxW, maxH / ratio);
-      const drawH   = drawW * ratio;
+      const imgRatio = canvas.height / canvas.width;
+      const drawW   = Math.min(maxW, maxH / imgRatio);
+      const drawH   = drawW * imgRatio;
       const offsetX = margin + (maxW - drawW) / 2;
       const offsetY = margin + (maxH - drawH) / 2;
 
-      // PNG for lossless sharpness
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
       toast({ title: '✅ PDF exportado em alta qualidade!' });
