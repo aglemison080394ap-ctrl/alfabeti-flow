@@ -21,7 +21,7 @@ const SetupPage: React.FC = () => {
     const check = async () => {
       const { data, error } = await supabase.rpc('has_any_admin');
       if (!error && data === true) {
-        // Admin already exists — redirect immediately, don't show setup form
+        // Admin already exists — redirect away, nobody should see this page
         navigate('/login', { replace: true });
         return;
       }
@@ -30,10 +30,42 @@ const SetupPage: React.FC = () => {
     check();
   }, [navigate]);
 
+  const handleSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !email || !password) {
+      toast({ title: 'Preencha todos os campos', variant: 'destructive' });
+      return;
+    }
+    if (password.length < 6) {
+      toast({ title: 'Senha muito curta', description: 'Mínimo 6 caracteres', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, role: 'admin' } },
+    });
+    if (error) {
+      toast({ title: 'Erro ao criar administrador', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Administrador criado!', description: 'Faça login com as credenciais cadastradas.' });
+      navigate('/login');
+    }
+    setLoading(false);
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Header */}
         <div className="text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg mx-auto">
             <BookOpen className="w-8 h-8 text-white" />
