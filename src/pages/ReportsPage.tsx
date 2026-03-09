@@ -475,20 +475,19 @@ const ReportsPage: React.FC = () => {
           alignItems: 'center',
           gap: 20,
         }}>
-          {/* Emblem */}
-          <div style={{
-            width: 68, height: 68, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.15)',
-            border: '2px solid rgba(255,255,255,0.4)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <div style={{ color: '#fff', fontSize: 7.5, fontWeight: 900, lineHeight: 1.2, textAlign: 'center', letterSpacing: 0.3 }}>
-              E.M.E.F<br/>
-              <span style={{ fontSize: 6.5 }}>ROSELI<br/>PAIVA</span>
-            </div>
-          </div>
+          {/* School Logo */}
+          <img
+            src={schoolLogo}
+            alt="Logo E.M.E.F Roseli Paiva"
+            style={{
+              width: 80, height: 80,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '3px solid rgba(255,255,255,0.6)',
+              background: '#fff',
+              flexShrink: 0,
+            }}
+          />
 
           {/* School info */}
           <div style={{ flex: 1 }}>
