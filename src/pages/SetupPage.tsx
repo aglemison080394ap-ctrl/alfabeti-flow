@@ -20,18 +20,17 @@ const SetupPage: React.FC = () => {
 
   useEffect(() => {
     const check = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .limit(1);
-      if (!error && data && data.length > 0) {
-        setAdminExists(true);
+      const { data, error } = await supabase.rpc('has_any_admin');
+      if (!error && data === true) {
+        // Admin already exists — redirect immediately, don't show setup form
+        navigate('/login', { replace: true });
+        return;
       }
+      setAdminExists(false);
       setChecking(false);
     };
     check();
-  }, []);
+  }, [navigate]);
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
