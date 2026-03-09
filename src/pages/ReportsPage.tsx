@@ -770,7 +770,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPNG(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`, true)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.png')
