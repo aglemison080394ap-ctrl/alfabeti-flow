@@ -723,13 +723,14 @@ const ReportsPage: React.FC = () => {
     const teacher  = reportData?.classData?.teachers?.name || '';
     const today    = new Date().toLocaleDateString('pt-BR');
     const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
-    const activeTotal = activeBimestreData?.activeB?.total ?? 0;
-    const activeBim   = activeBimestreData?.activeB?.bimestre ?? '?';
+    const activeAssessed = activeBimestreData?.activeB?.assessed ?? 0;
+    const totalStudents  = reportData?.students?.length ?? 0;
+    const activeBim      = activeBimestreData?.activeB?.bimestre ?? '?';
 
     const statsCards = [
-      { label: 'Total de Alunos',    value: reportData?.students?.length ?? 0,  color: '#0f2d55', bg: '#e8f0fb' },
-      { label: 'Avaliados',          value: activeTotal,                         color: '#15803d', bg: '#dcfce7' },
-      { label: 'Não Avaliados',      value: (reportData?.students?.length ?? 0) - activeTotal, color: '#b45309', bg: '#fef3c7' },
+      { label: 'Total de Alunos',    value: totalStudents,                        color: '#0f2d55', bg: '#e8f0fb' },
+      { label: 'Avaliados',          value: activeAssessed,                       color: '#15803d', bg: '#dcfce7' },
+      { label: 'Não Avaliados',      value: totalStudents - activeAssessed,       color: '#b45309', bg: '#fef3c7' },
       { label: `${activeBim}º Bimestre`, value: 'Selecionado', color: '#1d4ed8', bg: '#dbeafe' },
     ];
 
