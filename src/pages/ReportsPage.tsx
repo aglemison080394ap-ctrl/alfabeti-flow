@@ -223,22 +223,26 @@ const ReportsPage: React.FC = () => {
       assessMap[a.student_id][a.bimestre] = a;
     });
 
+    const totalStudents = (students || []).length;
+
     const bimestreStats = (['1','2','3','4'] as const).map(b => {
       const bData = finalAssessments.filter(a => a.bimestre === b);
-      const total = bData.length;
+      // assessed = alunos com registro nesse bimestre (inclui "não avaliado")
+      const assessed = bData.length;
       const wC = { PS: 0, S: 0, SA: 0, A: 0 };
       const rC = { NL: 0, LP: 0, LF: 0, LT: 0 };
       bData.forEach(a => {
         if (a.writing_level) wC[a.writing_level as keyof typeof wC]++;
         if (a.reading_level) rC[a.reading_level as keyof typeof rC]++;
       });
-      return { bimestre: b, total, wC, rC };
+      // total = todos os alunos da turma (inclui os não avaliados)
+      return { bimestre: b, total: totalStudents, assessed, wC, rC };
     });
 
     const evolutionData = bimestreStats.map(b => ({
       name: `${b.bimestre}º Bim`,
-      'Alfabético': b.total > 0 ? Math.round((b.wC.A  / b.total) * 100) : 0,
-      'Leu Texto':  b.total > 0 ? Math.round((b.rC.LT / b.total) * 100) : 0,
+      'Alfabético': b.assessed > 0 ? Math.round((b.wC.A  / b.assessed) * 100) : 0,
+      'Leu Texto':  b.assessed > 0 ? Math.round((b.rC.LT / b.assessed) * 100) : 0,
     }));
 
     setReportData({
