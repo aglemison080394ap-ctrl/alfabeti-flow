@@ -894,6 +894,32 @@ const ReportsPage: React.FC = () => {
             {/* Dashboard actions */}
             <div className="flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border">
               <span className="text-xs text-muted-foreground font-bold uppercase tracking-wide w-full mb-1">📊 Gráficos</span>
+              {/* Bimestre selector */}
+              <div className="w-full mb-1">
+                <p className="text-xs text-muted-foreground mb-1">Bimestre dos gráficos:</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[
+                    { value: 'auto', label: 'Automático' },
+                    { value: '1', label: '1º Bim' },
+                    { value: '2', label: '2º Bim' },
+                    { value: '3', label: '3º Bim' },
+                    { value: '4', label: '4º Bim' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSelectedBimestre(opt.value)}
+                      className={cn(
+                        'px-3 py-1 rounded-lg text-xs font-semibold border transition-colors',
+                        selectedBimestre === opt.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:bg-muted'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Button variant="outline" size="sm" onClick={() => printSection('print-dashboard-section')} className="gap-1.5 h-8 text-xs">
                 <Printer className="w-3.5 h-3.5" /> Imprimir
               </Button>
@@ -901,7 +927,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPNG(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.png`)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.png')
@@ -913,7 +939,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, false)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.pdf`, false)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.pdf')
