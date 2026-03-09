@@ -979,7 +979,7 @@ const ReportsPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <div style={{ width: 4, height: 22, background: '#0f2d55', borderRadius: 2 }} />
                 <span style={{ color: '#0f2d55', fontSize: 13, fontWeight: 800, letterSpacing: 0.3 }}>
-                  Análise de Resultados — {reportData.latestBimestre}º Bimestre
+                  Análise de Resultados — {activeBimestreData?.activeB?.bimestre}º Bimestre
                 </span>
               </div>
 
@@ -996,7 +996,7 @@ const ReportsPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
-                      {reportData.writingChartData.map((item: any) => (
+                      {activeBimestreData?.writingChartData.map((item: any) => (
                         <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
                           <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
@@ -1007,7 +1007,7 @@ const ReportsPage: React.FC = () => {
                     <div style={{ flex: 1 }}>
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
-                          <Pie data={reportData.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                          <Pie data={activeBimestreData?.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
                               if (percent < 0.05) return null;
@@ -1016,7 +1016,7 @@ const ReportsPage: React.FC = () => {
                               return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
                             }}
                           >
-                            {reportData.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                            {activeBimestreData?.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
                           </Pie>
@@ -1037,7 +1037,7 @@ const ReportsPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
-                      {reportData.readingChartData.map((item: any) => (
+                      {activeBimestreData?.readingChartData.map((item: any) => (
                         <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
                           <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
@@ -1048,7 +1048,7 @@ const ReportsPage: React.FC = () => {
                     <div style={{ flex: 1 }}>
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
-                          <Pie data={reportData.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                          <Pie data={activeBimestreData?.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
                               if (percent < 0.05) return null;
@@ -1057,7 +1057,7 @@ const ReportsPage: React.FC = () => {
                               return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
                             }}
                           >
-                            {reportData.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                            {activeBimestreData?.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
                           </Pie>
