@@ -679,125 +679,14 @@ const ReportsPage: React.FC = () => {
           </div>
 
           {/* ════════════════════════════════════════════════
-              SECTION 1 — PRINTABLE TABLE (green theme)
+              SECTION 1 — PRINTABLE TABLE (reference layout)
           ════════════════════════════════════════════════ */}
           <div
             id="print-table-section"
             className="print-section bg-white rounded-2xl overflow-hidden border border-border shadow-card"
             ref={tableRef}
           >
-            <TableHeader />
-            <div className="p-5">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse" style={{ minWidth: 900 }}>
-                  <thead>
-                    <tr>
-                      <th rowSpan={2} className="border border-gray-300 bg-green-900 text-white p-2 text-center w-8">Nº</th>
-                      <th rowSpan={2} className="border border-gray-300 bg-green-900 text-white p-2 text-left w-48">Nome do Aluno</th>
-                      <th rowSpan={2} className="border border-gray-300 bg-green-900 text-white p-2 text-center w-10">Ida.</th>
-                      {['1º Bimestre','2º Bimestre','3º Bimestre','4º Bimestre'].map(b => (
-                        <th key={b} colSpan={3} className="border border-gray-300 bg-green-700 text-white p-2 text-center">{b}</th>
-                      ))}
-                    </tr>
-                    <tr>
-                      {['1','2','3','4'].map(b => (
-                        <React.Fragment key={b}>
-                          <th className="border border-gray-300 bg-green-600 text-white p-1.5 text-center">Escrita</th>
-                          <th className="border border-gray-300 bg-green-600 text-white p-1.5 text-center">Leitura</th>
-                          <th className="border border-gray-300 bg-green-600 text-white p-1.5 text-center">Faltas</th>
-                        </React.Fragment>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.students.map((student: any, idx: number) => (
-                      <tr key={student.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-green-50/40'}>
-                        <td className="border border-gray-200 p-1.5 text-center text-gray-500 font-medium">{idx + 1}</td>
-                        <td className="border border-gray-200 p-1.5 font-medium text-gray-800">{student.name}</td>
-                        <td className="border border-gray-200 p-1.5 text-center text-gray-600">{student.age || '—'}</td>
-                        {(['1','2','3','4'] as const).map(b => {
-                          const a = reportData.assessMap[student.id]?.[b];
-                          return (
-                            <React.Fragment key={b}>
-                              <td className="border border-gray-200 p-1.5 text-center">
-                                {a?.writing_level ? (
-                                  <span className={cn('inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border', LEVEL_CSS[a.writing_level])}>
-                                    {a.writing_level}
-                                  </span>
-                                ) : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="border border-gray-200 p-1.5 text-center">
-                                {a?.reading_level ? (
-                                  <span className={cn('inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border', LEVEL_CSS[a.reading_level])}>
-                                    {a.reading_level}
-                                  </span>
-                                ) : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="border border-gray-200 p-1.5 text-center text-gray-600">
-                                {a ? (a.absences ?? 0) : <span className="text-gray-300">—</span>}
-                              </td>
-                            </React.Fragment>
-                          );
-                        })}
-                      </tr>
-                    ))}
-
-                    {/* Totals row */}
-                    <tr className="bg-green-50 font-bold">
-                      <td colSpan={3} className="border border-gray-300 p-2 text-right text-gray-700 text-xs">
-                        TOTAIS POR BIMESTRE →
-                      </td>
-                      {(['1','2','3','4'] as const).map(b => {
-                        const s = reportData.bimestreStats.find((x: any) => x.bimestre === b);
-                        return (
-                          <React.Fragment key={b}>
-                            <td className="border border-gray-300 p-1.5 text-center">
-                              <div className="flex flex-col gap-0.5">
-                                {Object.entries(s?.wC || {}).map(([k, v]) => (v as number) > 0 ? (
-                                  <span key={k} className={cn('text-[9px] font-bold px-1 rounded border', LEVEL_CSS[k])}>{k}:{v as number}</span>
-                                ) : null)}
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 p-1.5 text-center">
-                              <div className="flex flex-col gap-0.5">
-                                {Object.entries(s?.rC || {}).map(([k, v]) => (v as number) > 0 ? (
-                                  <span key={k} className={cn('text-[9px] font-bold px-1 rounded border', LEVEL_CSS[k])}>{k}:{v as number}</span>
-                                ) : null)}
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 p-1.5 text-center text-gray-500 text-[10px]">
-                              {absenceTotal(reportData.assessMap, reportData.students, b)}
-                            </td>
-                          </React.Fragment>
-                        );
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Legend */}
-              <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-6 text-xs text-gray-600">
-                <div>
-                  <span className="font-bold text-gray-700">Escrita: </span>
-                  PS = Pré-silábico &nbsp;|&nbsp; S = Silábico &nbsp;|&nbsp; SA = Silábico-Alfabético &nbsp;|&nbsp; A = Alfabético
-                </div>
-                <div>
-                  <span className="font-bold text-gray-700">Leitura: </span>
-                  NL = Não Leu &nbsp;|&nbsp; LP = Leu Palavras &nbsp;|&nbsp; LF = Leu Frases &nbsp;|&nbsp; LT = Leu Texto
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="mt-6 flex gap-12 text-xs text-gray-600">
-                {['Professor(a)','Coordenador(a) Pedagógico(a)','Diretor(a)'].map(r => (
-                  <div key={r} className="flex-1">
-                    <div className="border-b border-gray-400 mb-1 pt-6" />
-                    <p className="text-center">{r}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SpreadsheetTable />
           </div>
 
           {/* ════════════════════════════════════════════════
