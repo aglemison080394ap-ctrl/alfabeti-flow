@@ -160,6 +160,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             {children}
           </div>
         </main>
+
+        {/* Footer */}
+        <footer className="border-t border-border px-6 py-2.5 flex items-center justify-end">
+          <p className="text-xs text-muted-foreground/60">
+            Desenvolvido por{' '}
+            <span className="font-medium text-muted-foreground">Aglemison Paixão Lobato</span>
+          </p>
+        </footer>
       </div>
     </div>
   );
