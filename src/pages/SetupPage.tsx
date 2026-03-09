@@ -12,7 +12,6 @@ const SetupPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [checking, setChecking] = useState(true);
-  const [adminExists, setAdminExists] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
