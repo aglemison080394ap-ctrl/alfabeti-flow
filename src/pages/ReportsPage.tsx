@@ -409,8 +409,9 @@ const ReportsPage: React.FC = () => {
       // For spreadsheet: stretch to fill the FULL page (no margins, no gaps)
       // For charts: 5mm margin, contain within page
       if (isSpreadsheet) {
-        // Fill entire A4 portrait page edge-to-edge
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
+        // A4 portrait com margem de 5mm em todos os lados
+        const m = 5;
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, pdfW - m * 2, pdfH - m * 2);
       } else {
         const margin   = 5;
         const maxW     = pdfW - margin * 2;
