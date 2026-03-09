@@ -783,7 +783,7 @@ const ReportsPage: React.FC = () => {
         </div>
 
         {/* ── Stats cards row ── */}
-        <div style={{ display: 'flex', gap: 0, background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
+        <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
           {statsCards.map((s, i) => (
             <div key={i} style={{
               flex: 1,
