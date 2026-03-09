@@ -207,20 +207,14 @@ const ReportsPage: React.FC = () => {
       }
     }
 
-    const [{ data: students }, { data: allAssessments }] = await Promise.all([
-      supabase.from('students').select('*').eq('class_id', selectedClass).order('name'),
-      supabase.from('assessments').select('*').in('student_id',
-        (await supabase.from('students').select('id').eq('class_id', selectedClass))
-          .data?.map(s => s.id) || []
-      ),
-    ]);
+    const { data: students } = await supabase
+      .from('students').select('*').eq('class_id', selectedClass).order('name');
 
-    // Re-fetch assessments properly with student ids
     const studentIds = students?.map(s => s.id) || [];
-    const { data: assessments } = studentIds.length > 0
+    const { data: rawAssessments } = studentIds.length > 0
       ? await supabase.from('assessments').select('*').in('student_id', studentIds)
       : { data: [] };
-    const finalAssessments = assessments || [];
+    const finalAssessments = rawAssessments || [];
 
     const assessMap: Record<string, Record<string, any>> = {};
     finalAssessments.forEach(a => {
