@@ -238,10 +238,9 @@ const ReportsPage: React.FC = () => {
       'Leu Texto':  b.total > 0 ? Math.round((b.rC.LT / b.total) * 100) : 0,
     }));
 
-    // Coordinator: class-level overrides school-level
-    const coordinatorName = (classData as any)?.coordinator_name
-      || schoolInfo.coordinator
-      || '___________________';
+    // Coordinator: only from teacher's own profile (teachers.coordinator_name)
+    // Never fall back to school_info.coordinator (that field was removed from the admin UI)
+    const coordinatorName = (classData as any)?.coordinator_name || '___________________';
 
     setReportData({
       classData, students: students || [], assessMap,
