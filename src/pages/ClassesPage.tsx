@@ -5,12 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Pencil, Trash2, School, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, School, Users, Search } from 'lucide-react';
 
-// Only 1º–5º Ano (Ensino Fundamental I)
 const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 
@@ -23,6 +32,9 @@ const ClassesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [search, setSearch] = useState('');
+  const [filterGrade, setFilterGrade] = useState('all');
   const [form, setForm] = useState({
     grade_year: '',
     class_letter: '',
@@ -33,9 +45,8 @@ const ClassesPage: React.FC = () => {
   const fetchAll = async () => {
     if (!profile) return;
 
-    let classesQuery = supabase.from('classes').select('*, teachers(name)').order('grade_year');
+    let classesQuery = supabase.from('classes').select('*, teachers(name)').order('grade_year').order('class_letter');
 
-    // Teachers only see their own classes
     if (!isAdmin) {
       const { data: teacherData } = await supabase
         .from('teachers')
@@ -83,7 +94,7 @@ const ClassesPage: React.FC = () => {
       grade_year: cls.grade_year,
       class_letter: cls.class_letter,
       teacher_id: cls.teacher_id || '',
-      coordinator_name: (cls as any).coordinator_name || '',
+      coordinator_name: cls.coordinator_name || '',
     });
     setDialogOpen(true);
   };
@@ -105,23 +116,24 @@ const ClassesPage: React.FC = () => {
       : await supabase.from('classes').insert(payload);
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: editingClass ? 'Turma atualizada!' : 'Turma criada!' });
+    toast({ title: editingClass ? 'Turma atualizada com sucesso!' : 'Turma criada com sucesso!' });
     setDialogOpen(false);
     fetchAll();
   };
 
-  const handleDelete = async (cls: any) => {
-    if (!confirm(`Deseja excluir a turma ${cls.grade_year} ${cls.class_letter}? Todos os alunos serão excluídos.`)) return;
-    const { error } = await supabase.from('classes').delete().eq('id', cls.id);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from('classes').delete().eq('id', deleteTarget.id);
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-      return;
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Turma excluída', description: `${deleteTarget.grade_year} ${deleteTarget.class_letter} foi removida do sistema.` });
+      fetchAll();
     }
-    toast({ title: 'Turma excluída!' });
-    fetchAll();
+    setDeleteTarget(null);
   };
 
   const gradeColors: Record<string, string> = {
@@ -133,8 +145,24 @@ const ClassesPage: React.FC = () => {
   };
   const getGradeColor = (grade: string) => gradeColors[grade[0]] || 'bg-muted text-muted-foreground border-border';
 
+  const filtered = classes.filter(cls => {
+    const matchesGrade = filterGrade === 'all' || cls.grade_year === filterGrade;
+    const matchesSearch = search === '' ||
+      `${cls.grade_year} ${cls.class_letter}`.toLowerCase().includes(search.toLowerCase()) ||
+      (cls.teachers?.name || '').toLowerCase().includes(search.toLowerCase());
+    return matchesGrade && matchesSearch;
+  });
+
+  // Group by grade for better readability with many classes
+  const grouped = GRADES.reduce<Record<string, any[]>>((acc, grade) => {
+    const items = filtered.filter(c => c.grade_year === grade);
+    if (items.length > 0) acc[grade] = items;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">Turmas</h1>
@@ -157,9 +185,7 @@ const ClassesPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Série/Ano Escolar *</Label>
                   <Select value={form.grade_year} onValueChange={v => setForm(f => ({ ...f, grade_year: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o ano" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione o ano" /></SelectTrigger>
                     <SelectContent>
                       {GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
@@ -168,9 +194,7 @@ const ClassesPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Letra da Turma *</Label>
                   <Select value={form.class_letter} onValueChange={v => setForm(f => ({ ...f, class_letter: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a letra" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione a letra" /></SelectTrigger>
                     <SelectContent>
                       {LETTERS.map(l => <SelectItem key={l} value={l}>Turma {l}</SelectItem>)}
                     </SelectContent>
@@ -179,9 +203,7 @@ const ClassesPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Professor Responsável</Label>
                   <Select value={form.teacher_id || 'none'} onValueChange={v => setForm(f => ({ ...f, teacher_id: v === 'none' ? '' : v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o professor" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione o professor" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem professor</SelectItem>
                       {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
@@ -195,9 +217,7 @@ const ClassesPage: React.FC = () => {
                     onChange={e => setForm(f => ({ ...f, coordinator_name: e.target.value }))}
                     placeholder="Ex: Maria da Silva"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Aparecerá no cabeçalho do relatório dessa turma.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Aparecerá no cabeçalho do relatório dessa turma.</p>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -211,67 +231,131 @@ const ClassesPage: React.FC = () => {
         )}
       </div>
 
+      {/* Filters */}
+      {classes.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar turma ou professor..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={filterGrade} onValueChange={setFilterGrade}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Todos os anos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Content */}
       {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3,4].map(i => <Card key={i} className="p-5 animate-pulse h-36 bg-muted" />)}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[1,2,3,4,5,6,7,8].map(i => <Card key={i} className="p-5 animate-pulse h-32 bg-muted" />)}
         </div>
       ) : classes.length === 0 ? (
         <Card className="p-12 text-center">
           <School className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
           <p className="text-muted-foreground font-medium">Nenhuma turma cadastrada</p>
         </Card>
+      ) : filtered.length === 0 ? (
+        <Card className="p-10 text-center">
+          <p className="text-muted-foreground">Nenhuma turma encontrada para os filtros selecionados.</p>
+        </Card>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.map(cls => (
-            <Card key={cls.id} className="p-5 shadow-card hover:shadow-hover transition-all group">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`px-3 py-1 rounded-lg border text-sm font-display font-bold ${getGradeColor(cls.grade_year)}`}>
-                  {cls.grade_year} {cls.class_letter}
-                </div>
-                {isAdmin && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(cls)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDelete(cls)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                )}
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([grade, items]) => (
+            <div key={grade}>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold border ${getGradeColor(grade)}`}>{grade}</span>
+                <span>{items.length} turma(s)</span>
+              </h2>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {items.map(cls => (
+                  <Card key={cls.id} className="p-4 shadow-card hover:shadow-hover transition-all group">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className={`px-2.5 py-1 rounded-lg border text-sm font-display font-bold ${getGradeColor(cls.grade_year)}`}>
+                        {cls.grade_year} – {cls.class_letter}
+                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cls)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteTarget(cls)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-3">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        <strong className="text-foreground">{studentCounts[cls.id] || 0}</strong> aluno(s)
+                      </span>
+                    </div>
+
+                    {cls.teachers && (
+                      <div className="mt-1.5 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        <span className="text-xs text-muted-foreground truncate">{cls.teachers.name}</span>
+                      </div>
+                    )}
+                    {!cls.teachers && (
+                      <div className="mt-1.5 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+                        <span className="text-xs text-muted-foreground">Sem professor</span>
+                      </div>
+                    )}
+                    {cls.coordinator_name && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                        <span className="text-xs text-muted-foreground truncate">Coord: {cls.coordinator_name}</span>
+                      </div>
+                    )}
+                  </Card>
+                ))}
               </div>
-              <div className="flex items-center gap-2 mt-3">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">{studentCounts[cls.id] || 0}</strong> aluno(s)
-                </span>
-              </div>
-              {cls.teachers && (
-                <div className="mt-2 flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <span className="text-xs text-muted-foreground truncate">{cls.teachers.name}</span>
-                </div>
-              )}
-              {!cls.teachers && (
-                <div className="mt-2 flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Sem professor vinculado</span>
-                </div>
-              )}
-              {(cls as any).coordinator_name && (
-                <div className="mt-1 flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-accent" />
-                  <span className="text-xs text-muted-foreground truncate">Coord: {(cls as any).coordinator_name}</span>
-                </div>
-              )}
-            </Card>
+            </div>
           ))}
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display font-bold">
+              Excluir turma {deleteTarget?.grade_year} {deleteTarget?.class_letter}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Esta ação é permanente e não poderá ser desfeita. Todos os alunos e sondagens vinculados a esta turma também serão removidos do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, excluir turma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
