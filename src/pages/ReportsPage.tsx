@@ -355,9 +355,9 @@ const ReportsPage: React.FC = () => {
         clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => {
           node.style.transform = 'none';
         });
-        // Ensure fonts are rendered (force repaint hint)
-        (clonedEl as HTMLElement).style.fontSmooth = 'always';
-        (clonedEl as HTMLElement).style.webkitFontSmoothing = 'antialiased';
+        // Ensure font smoothing (cast to any to bypass TS strict CSSStyleDeclaration)
+        (clonedEl as any).style['font-smooth'] = 'always';
+        (clonedEl as any).style['-webkit-font-smoothing'] = 'antialiased';
       },
     });
 
