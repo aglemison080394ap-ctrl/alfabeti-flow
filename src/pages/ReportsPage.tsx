@@ -283,65 +283,86 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── High-quality capture helper ─────────────────────────────── */
-  const captureElement = async (el: HTMLDivElement, scale = 3): Promise<HTMLCanvasElement> => {
+  const captureElement = async (el: HTMLDivElement): Promise<HTMLCanvasElement> => {
     const html2canvas = (await import('html2canvas')).default;
 
-    // Snapshot original inline styles
-    const prevWidth    = el.style.width;
-    const prevMaxWidth = el.style.maxWidth;
-    const prevOverflow = el.style.overflow;
-    const prevPosition = el.style.position;
-    const prevTransform = el.style.transform;
+    // 1. Collect live SVG dimensions BEFORE cloning (getBoundingClientRect works here)
+    const svgSizeMap = new Map<SVGElement, { w: number; h: number }>();
+    el.querySelectorAll<SVGElement>('svg').forEach(svg => {
+      const r = svg.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      }
+    });
 
-    // Lock to a fixed width so Recharts SVGs render at full size
-    const EXPORT_WIDTH = 1280;
-    el.style.width     = `${EXPORT_WIDTH}px`;
+    // 2. Snapshot styles
+    const prev = {
+      width: el.style.width, maxWidth: el.style.maxWidth,
+      overflow: el.style.overflow, position: el.style.position,
+      transform: el.style.transform,
+    };
+
+    // 3. Expand to fixed width so Recharts fills properly
+    const EXPORT_W = 1440;
+    el.style.width     = `${EXPORT_W}px`;
     el.style.maxWidth  = 'none';
     el.style.overflow  = 'visible';
     el.style.position  = 'relative';
     el.style.transform = 'none';
 
-    // Allow Recharts ResizableContainers to recalculate
-    await new Promise(r => setTimeout(r, 600));
+    // 4. Wait for Recharts ResizableContainers to re-render
+    await new Promise(r => setTimeout(r, 800));
 
-    const scrollW = el.scrollWidth;
-    const scrollH = el.scrollHeight;
+    // Re-collect SVG sizes after resize (now they may be bigger)
+    el.querySelectorAll<SVGElement>('svg').forEach(svg => {
+      const r = svg.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      }
+    });
+
+    const W = el.scrollWidth;
+    const H = el.scrollHeight;
 
     const canvas = await html2canvas(el, {
-      scale,
+      scale: 4,                   // 4× = ~300 DPI on screen → HD export
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false,
       allowTaint: false,
-      width:        scrollW,
-      height:       scrollH,
-      windowWidth:  scrollW + 60,
-      windowHeight: scrollH + 60,
+      width: W,
+      height: H,
+      windowWidth:  W + 80,
+      windowHeight: H + 80,
       x: 0,
       y: 0,
       onclone: (_doc: Document, clonedEl: HTMLElement) => {
-        // Force every SVG to declare explicit pixel dimensions so html2canvas
-        // doesn't collapse them to 0×0 (which caused "torn" charts)
-        clonedEl.querySelectorAll('svg').forEach((svg: SVGElement) => {
-          const rect = svg.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            svg.setAttribute('width',  String(Math.ceil(rect.width)));
-            svg.setAttribute('height', String(Math.ceil(rect.height)));
+        // Apply pre-collected sizes to cloned SVGs
+        const clonedSvgs = clonedEl.querySelectorAll<SVGElement>('svg');
+        const origSvgs   = el.querySelectorAll<SVGElement>('svg');
+        clonedSvgs.forEach((clonedSvg, i) => {
+          const origSvg = origSvgs[i];
+          if (!origSvg) return;
+          const dims = svgSizeMap.get(origSvg);
+          if (dims) {
+            clonedSvg.setAttribute('width',  String(dims.w));
+            clonedSvg.setAttribute('height', String(dims.h));
+            clonedSvg.style.width  = `${dims.w}px`;
+            clonedSvg.style.height = `${dims.h}px`;
           }
         });
-        // Remove any transforms/translate that could misalign layers
-        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(el => {
-          el.style.transform = 'none';
+        // Flatten all transforms so nothing shifts
+        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => {
+          node.style.transform = 'none';
         });
+        // Ensure font smoothing (cast to any to bypass TS strict CSSStyleDeclaration)
+        (clonedEl as any).style['font-smooth'] = 'always';
+        (clonedEl as any).style['-webkit-font-smoothing'] = 'antialiased';
       },
     });
 
-    // Restore original styles
-    el.style.width     = prevWidth;
-    el.style.maxWidth  = prevMaxWidth;
-    el.style.overflow  = prevOverflow;
-    el.style.position  = prevPosition;
-    el.style.transform = prevTransform;
+    // 5. Restore styles
+    Object.assign(el.style, prev);
 
     return canvas;
   };
@@ -351,12 +372,12 @@ const ReportsPage: React.FC = () => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const canvas = await captureElement(ref.current, 3);
+      const canvas = await captureElement(ref.current);
       const link   = document.createElement('a');
-      link.download = filename.replace(/\.(jpg|jpeg)$/i, '.png');
+      link.download = filename.replace(/\.(jpg|jpeg|pdf)$/i, '.png');
       link.href     = canvas.toDataURL('image/png');
       link.click();
-      toast({ title: 'PNG exportado com sucesso!' });
+      toast({ title: '✅ PNG exportado em alta qualidade!' });
     } catch (e) {
       console.error(e);
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
@@ -369,15 +390,14 @@ const ReportsPage: React.FC = () => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      // Use scale 3 for HD — jsPDF compresses internally anyway
-      const canvas    = await captureElement(ref.current, 3);
+      const canvas    = await captureElement(ref.current);
       const { jsPDF } = await import('jspdf');
 
       const imgW  = canvas.width;
       const imgH  = canvas.height;
       const ratio = imgH / imgW;
 
-      // A4 landscape: 297 × 210 mm  |  portrait: 210 × 297 mm
+      // A4: landscape 297×210mm / portrait 210×297mm
       const landscape = ratio < 1;
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
@@ -386,10 +406,10 @@ const ReportsPage: React.FC = () => {
         orientation: landscape ? 'landscape' : 'portrait',
         unit: 'mm',
         format: 'a4',
-        compress: true,
+        compress: false,   // no compression → maximum sharpness
       });
 
-      const margin  = 6;
+      const margin  = 5;
       const maxW    = pdfW - margin * 2;
       const maxH    = pdfH - margin * 2;
       const drawW   = Math.min(maxW, maxH / ratio);
@@ -397,10 +417,10 @@ const ReportsPage: React.FC = () => {
       const offsetX = margin + (maxW - drawW) / 2;
       const offsetY = margin + (maxH - drawH) / 2;
 
-      // Use PNG for pixel-perfect sharpness (no JPEG compression blur)
+      // PNG for lossless sharpness
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
-      toast({ title: 'PDF exportado com sucesso!' });
+      toast({ title: '✅ PDF exportado em alta qualidade!' });
     } catch (e) {
       console.error(e);
       toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
