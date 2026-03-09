@@ -139,10 +139,11 @@ const ReportsPage: React.FC = () => {
     coordinator: '',
     active_school_year: new Date().getFullYear(),
   });
-  const [selectedClass, setSelectedClass] = useState<string>('');
-  const [reportData, setReportData]       = useState<any>(null);
-  const [loading, setLoading]             = useState(false);
-  const [generating, setGenerating]       = useState<string | null>(null);
+  const [selectedClass, setSelectedClass]       = useState<string>('');
+  const [selectedBimestre, setSelectedBimestre] = useState<string>('auto');
+  const [reportData, setReportData]             = useState<any>(null);
+  const [loading, setLoading]                   = useState(false);
+  const [generating, setGenerating]             = useState<string | null>(null);
 
   // Load only teacher's own classes (or all for admin)
   useEffect(() => {
@@ -195,7 +196,6 @@ const ReportsPage: React.FC = () => {
 
     const classData = classes.find(c => c.id === selectedClass);
 
-    // Fetch coordinator name directly from teachers table (set by teacher in their profile)
     let coordinatorName = '___________________';
     if (classData?.teacher_id) {
       const { data: teacherRow } = await supabase
@@ -235,20 +235,6 @@ const ReportsPage: React.FC = () => {
       return { bimestre: b, total, wC, rC };
     });
 
-    const latestB = [...bimestreStats].reverse().find(b => b.total > 0) || bimestreStats[0];
-
-    const writingChartData = Object.entries(latestB.wC).map(([key, value]) => ({
-      name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
-      value, color: WRITING_LEVELS[key].color,
-      pct: latestB.total > 0 ? Math.round((value / latestB.total) * 100) : 0,
-    }));
-
-    const readingChartData = Object.entries(latestB.rC).map(([key, value]) => ({
-      name: READING_LEVELS[key].label, short: READING_LEVELS[key].short,
-      value, color: READING_LEVELS[key].color,
-      pct: latestB.total > 0 ? Math.round((value / latestB.total) * 100) : 0,
-    }));
-
     const evolutionData = bimestreStats.map(b => ({
       name: `${b.bimestre}º Bim`,
       'Alfabético': b.total > 0 ? Math.round((b.wC.A  / b.total) * 100) : 0,
@@ -257,12 +243,36 @@ const ReportsPage: React.FC = () => {
 
     setReportData({
       classData, students: students || [], assessMap,
-      bimestreStats, writingChartData, readingChartData,
-      evolutionData, latestTotal: latestB.total, latestBimestre: latestB.bimestre,
+      bimestreStats,
+      evolutionData,
       coordinatorName,
     });
+    setSelectedBimestre('auto');
     setLoading(false);
   };
+
+  /* ── Compute chart data for selected bimestre ──────────────────── */
+  const activeBimestreData = React.useMemo(() => {
+    if (!reportData) return null;
+    const { bimestreStats } = reportData;
+    let activeB;
+    if (selectedBimestre === 'auto') {
+      activeB = [...bimestreStats].reverse().find((b: any) => b.total > 0) || bimestreStats[0];
+    } else {
+      activeB = bimestreStats.find((b: any) => b.bimestre === selectedBimestre) || bimestreStats[0];
+    }
+    const writingChartData = Object.entries(activeB.wC).map(([key, value]: [string, any]) => ({
+      name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
+      value, color: WRITING_LEVELS[key].color,
+      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+    }));
+    const readingChartData = Object.entries(activeB.rC).map(([key, value]: [string, any]) => ({
+      name: READING_LEVELS[key].label, short: READING_LEVELS[key].short,
+      value, color: READING_LEVELS[key].color,
+      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+    }));
+    return { activeB, writingChartData, readingChartData };
+  }, [reportData, selectedBimestre]);
 
   /* ── Print helper ─────────────────────────────────────────────── */
   const printSection = (sectionId: string) => {
@@ -708,12 +718,14 @@ const ReportsPage: React.FC = () => {
     const teacher  = reportData?.classData?.teachers?.name || '';
     const today    = new Date().toLocaleDateString('pt-BR');
     const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
+    const activeTotal = activeBimestreData?.activeB?.total ?? 0;
+    const activeBim   = activeBimestreData?.activeB?.bimestre ?? '?';
 
     const statsCards = [
       { label: 'Total de Alunos',    value: reportData?.students?.length ?? 0,  color: '#0f2d55', bg: '#e8f0fb' },
-      { label: 'Avaliados',          value: reportData?.latestTotal ?? 0,        color: '#15803d', bg: '#dcfce7' },
-      { label: 'Não Avaliados',      value: (reportData?.students?.length ?? 0) - (reportData?.latestTotal ?? 0), color: '#b45309', bg: '#fef3c7' },
-      { label: `${reportData?.latestBimestre}º Bimestre`, value: 'Atual', color: '#1d4ed8', bg: '#dbeafe' },
+      { label: 'Avaliados',          value: activeTotal,                         color: '#15803d', bg: '#dcfce7' },
+      { label: 'Não Avaliados',      value: (reportData?.students?.length ?? 0) - activeTotal, color: '#b45309', bg: '#fef3c7' },
+      { label: `${activeBim}º Bimestre`, value: 'Selecionado', color: '#1d4ed8', bg: '#dbeafe' },
     ];
 
     return (
@@ -882,6 +894,32 @@ const ReportsPage: React.FC = () => {
             {/* Dashboard actions */}
             <div className="flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border">
               <span className="text-xs text-muted-foreground font-bold uppercase tracking-wide w-full mb-1">📊 Gráficos</span>
+              {/* Bimestre selector */}
+              <div className="w-full mb-1">
+                <p className="text-xs text-muted-foreground mb-1">Bimestre dos gráficos:</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[
+                    { value: 'auto', label: 'Automático' },
+                    { value: '1', label: '1º Bim' },
+                    { value: '2', label: '2º Bim' },
+                    { value: '3', label: '3º Bim' },
+                    { value: '4', label: '4º Bim' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSelectedBimestre(opt.value)}
+                      className={cn(
+                        'px-3 py-1 rounded-lg text-xs font-semibold border transition-colors',
+                        selectedBimestre === opt.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:bg-muted'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Button variant="outline" size="sm" onClick={() => printSection('print-dashboard-section')} className="gap-1.5 h-8 text-xs">
                 <Printer className="w-3.5 h-3.5" /> Imprimir
               </Button>
@@ -889,7 +927,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPNG(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.png`)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.png')
@@ -901,7 +939,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, false)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.pdf`, false)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.pdf')
@@ -941,7 +979,7 @@ const ReportsPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <div style={{ width: 4, height: 22, background: '#0f2d55', borderRadius: 2 }} />
                 <span style={{ color: '#0f2d55', fontSize: 13, fontWeight: 800, letterSpacing: 0.3 }}>
-                  Análise de Resultados — {reportData.latestBimestre}º Bimestre
+                  Análise de Resultados — {activeBimestreData?.activeB?.bimestre}º Bimestre
                 </span>
               </div>
 
@@ -958,7 +996,7 @@ const ReportsPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
-                      {reportData.writingChartData.map((item: any) => (
+                      {activeBimestreData?.writingChartData.map((item: any) => (
                         <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
                           <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
@@ -969,7 +1007,7 @@ const ReportsPage: React.FC = () => {
                     <div style={{ flex: 1 }}>
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
-                          <Pie data={reportData.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                          <Pie data={activeBimestreData?.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
                               if (percent < 0.05) return null;
@@ -978,7 +1016,7 @@ const ReportsPage: React.FC = () => {
                               return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
                             }}
                           >
-                            {reportData.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                            {activeBimestreData?.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
                           </Pie>
@@ -999,7 +1037,7 @@ const ReportsPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
-                      {reportData.readingChartData.map((item: any) => (
+                      {activeBimestreData?.readingChartData.map((item: any) => (
                         <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
                           <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
@@ -1010,7 +1048,7 @@ const ReportsPage: React.FC = () => {
                     <div style={{ flex: 1 }}>
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
-                          <Pie data={reportData.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                          <Pie data={activeBimestreData?.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
                               if (percent < 0.05) return null;
@@ -1019,7 +1057,7 @@ const ReportsPage: React.FC = () => {
                               return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
                             }}
                           >
-                            {reportData.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                            {activeBimestreData?.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
                           </Pie>
