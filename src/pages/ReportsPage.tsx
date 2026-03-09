@@ -139,10 +139,11 @@ const ReportsPage: React.FC = () => {
     coordinator: '',
     active_school_year: new Date().getFullYear(),
   });
-  const [selectedClass, setSelectedClass] = useState<string>('');
-  const [reportData, setReportData]       = useState<any>(null);
-  const [loading, setLoading]             = useState(false);
-  const [generating, setGenerating]       = useState<string | null>(null);
+  const [selectedClass, setSelectedClass]       = useState<string>('');
+  const [selectedBimestre, setSelectedBimestre] = useState<string>('auto');
+  const [reportData, setReportData]             = useState<any>(null);
+  const [loading, setLoading]                   = useState(false);
+  const [generating, setGenerating]             = useState<string | null>(null);
 
   // Load only teacher's own classes (or all for admin)
   useEffect(() => {
