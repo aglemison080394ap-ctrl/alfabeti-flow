@@ -702,23 +702,109 @@ const ReportsPage: React.FC = () => {
     );
   };
 
-  /* ── Clean dashboard header (title + class + bimestre only) ─────── */
-  const DashHeader = () => (
-    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">Dashboard de Resultados</p>
-        <h2 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Nunito, sans-serif' }}>
-          {reportData?.classData?.grade_year} {reportData?.classData?.class_letter}
-        </h2>
+  /* ── Professional Dashboard Export Header ─────────────────────── */
+  const DashHeader = () => {
+    const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
+    const teacher  = reportData?.classData?.teachers?.name || '';
+    const today    = new Date().toLocaleDateString('pt-BR');
+    const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
+
+    const statsCards = [
+      { label: 'Total de Alunos',    value: reportData?.students?.length ?? 0,  color: '#0f2d55', bg: '#e8f0fb' },
+      { label: 'Avaliados',          value: reportData?.latestTotal ?? 0,        color: '#15803d', bg: '#dcfce7' },
+      { label: 'Não Avaliados',      value: (reportData?.students?.length ?? 0) - (reportData?.latestTotal ?? 0), color: '#b45309', bg: '#fef3c7' },
+      { label: `${reportData?.latestBimestre}º Bimestre`, value: 'Atual', color: '#1d4ed8', bg: '#dbeafe' },
+    ];
+
+    return (
+      <div style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
+        {/* ── Top gradient band ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
+          padding: '20px 28px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+        }}>
+          <img
+            src={schoolLogo}
+            alt="Logo"
+            style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))' }}
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 8.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
+              Secretaria Municipal de Educação
+            </div>
+            <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
+              {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9.5, marginTop: 3 }}>
+              {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYr}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 8,
+            padding: '10px 16px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 }}>Documento Oficial</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Dashboard de Resultados</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Sondagem</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 4 }}>{today}</div>
+          </div>
+        </div>
+
+        {/* ── Meta row ── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '3px solid #0f2d55',
+          background: '#f0f5fc',
+        }}>
+          {[
+            { label: 'PROFESSOR(A)',       value: teacher },
+            { label: 'TURMA',              value: turma },
+            { label: 'COORDENADOR(A)',     value: reportData?.coordinatorName || '' },
+            { label: 'DATA DE EMISSÃO',    value: today },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: i === 0 || i === 2 ? 2 : 1,
+              padding: '8px 14px',
+              borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
+            }}>
+              <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>
+                {item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Stats cards row ── */}
+        <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
+          {statsCards.map((s, i) => (
+            <div key={i} style={{
+              flex: 1,
+              background: s.bg,
+              border: `1px solid ${s.color}30`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              textAlign: 'center',
+            }}>
+              <div style={{ color: s.color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>
+                {s.value}
+              </div>
+              <div style={{ color: s.color, fontSize: 8.5, fontWeight: 600, marginTop: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="text-right">
-        <span className="inline-block bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1 rounded-full">
-          {reportData?.latestBimestre}º Bimestre
-        </span>
-        <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleDateString('pt-BR')}</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   /* ── JSX ─────────────────────────────────────────────────────── */
   return (
@@ -838,53 +924,177 @@ const ReportsPage: React.FC = () => {
           </div>
 
           {/* ════════════════════════════════════════════════
-              SECTION 2 — CLEAN DASHBOARD (charts only)
+              SECTION 2 — PROFESSIONAL DASHBOARD (charts)
           ════════════════════════════════════════════════ */}
           <div
             id="print-dashboard-section"
             className="print-section bg-white rounded-2xl overflow-hidden border border-border shadow-card"
             ref={dashRef}
+            style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}
           >
-            {/* Clean minimal header — no school/secretary info */}
+            {/* Professional header with logo + meta + stats */}
             <DashHeader />
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-6">
-                <DonutSection
-                  title="Níveis de Escrita" icon={PenLine}
-                  data={reportData.writingChartData} total={reportData.latestTotal}
-                />
-                <DonutSection
-                  title="Níveis de Leitura" icon={BookOpen}
-                  data={reportData.readingChartData} total={reportData.latestTotal}
-                />
-                <div>
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <TrendingUp className="w-4 h-4 text-blue-600" />
-                    <p className="text-sm font-bold text-gray-700">Evolução da Alfabetização</p>
+
+            {/* Charts area */}
+            <div style={{ padding: '20px 24px 0', background: '#f8fafc' }}>
+              {/* Section title */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <div style={{ width: 4, height: 22, background: '#0f2d55', borderRadius: 2 }} />
+                <span style={{ color: '#0f2d55', fontSize: 13, fontWeight: 800, letterSpacing: 0.3 }}>
+                  Análise de Resultados — {reportData.latestBimestre}º Bimestre
+                </span>
+              </div>
+
+              {/* 3-column chart grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.1fr', gap: 16, marginBottom: 16 }}>
+
+                {/* ── Writing Donut ── */}
+                <div style={{ background: '#fff', border: '1px solid #dde6f0', borderRadius: 10, padding: '14px 16px', boxShadow: '0 2px 8px rgba(15,45,85,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: '#e8f0fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f2d55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </div>
+                    <span style={{ color: '#0f2d55', fontSize: 12, fontWeight: 700 }}>Níveis de Escrita</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
+                      {reportData.writingChartData.map((item: any) => (
+                        <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
+                          <span style={{ fontSize: 9, color: '#64748b' }}>{item.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <PieChart>
+                          <Pie data={reportData.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                              if (percent < 0.05) return null;
+                              const R = Math.PI / 180;
+                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
+                            }}
+                          >
+                            {reportData.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                              <Cell key={i} fill={e.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, _n: any, p: any) => [`${v} (${p.payload.pct}%)`, p.payload.name]} contentStyle={{ fontSize: '10px', borderRadius: '6px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Reading Donut ── */}
+                <div style={{ background: '#fff', border: '1px solid #dde6f0', borderRadius: 10, padding: '14px 16px', boxShadow: '0 2px 8px rgba(15,45,85,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: '#e8f0fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f2d55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    </div>
+                    <span style={{ color: '#0f2d55', fontSize: 12, fontWeight: 700 }}>Níveis de Leitura</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 110 }}>
+                      {reportData.readingChartData.map((item: any) => (
+                        <div key={item.short} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: item.color + '15', border: `1px solid ${item.color}35` }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: item.color }}>{item.short}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{item.value}</span>
+                          <span style={{ fontSize: 9, color: '#64748b' }}>{item.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <PieChart>
+                          <Pie data={reportData.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
+                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                              if (percent < 0.05) return null;
+                              const R = Math.PI / 180;
+                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
+                            }}
+                          >
+                            {reportData.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
+                              <Cell key={i} fill={e.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, _n: any, p: any) => [`${v} (${p.payload.pct}%)`, p.payload.name]} contentStyle={{ fontSize: '10px', borderRadius: '6px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Evolution Line Chart ── */}
+                <div style={{ background: '#fff', border: '1px solid #dde6f0', borderRadius: 10, padding: '14px 16px', boxShadow: '0 2px 8px rgba(15,45,85,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: '#e8f0fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f2d55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                    </div>
+                    <span style={{ color: '#0f2d55', fontSize: 12, fontWeight: 700 }}>Evolução da Alfabetização</span>
                   </div>
                   <ResponsiveContainer width="100%" height={195}>
-                    <LineChart data={reportData.evolutionData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} unit="%" domain={[0, 100]} />
+                    <LineChart data={reportData.evolutionData} margin={{ top: 5, right: 14, left: -18, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} />
+                      <YAxis tick={{ fontSize: 10, fill: '#475569' }} unit="%" domain={[0, 100]} />
                       <Tooltip
                         formatter={(v: any, n: any) => [`${v}%`, n]}
-                        contentStyle={{ fontSize: '10px', borderRadius: '6px' }}
+                        contentStyle={{ fontSize: '10px', borderRadius: '8px', border: '1px solid #dde6f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       />
                       <Legend wrapperStyle={{ fontSize: '10px' }} />
                       <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#22c55e', stroke: '#fff', strokeWidth: 1.5 }} />
-                      <Line type="monotone" dataKey="Leu Texto"  stroke="#3b82f6" strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }} />
+                        dot={{ r: 5, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }} />
+                      <Line type="monotone" dataKey="Leu Texto" stroke="#3b82f6" strokeWidth={2.5}
+                        dot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
+            </div>
 
-              {/* Compact legend */}
-              <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap gap-6 text-[11px] text-gray-500">
-                <span><strong className="text-gray-700">Escrita:</strong> PS=Pré-silábico · S=Silábico · SA=Sil.-Alfabético · A=Alfabético</span>
-                <span><strong className="text-gray-700">Leitura:</strong> NL=Não Leu · LP=Leu Palavras · LF=Leu Frases · LT=Leu Texto</span>
+            {/* ── Legend + Footer ── */}
+            <div style={{ padding: '14px 24px 20px', background: '#f8fafc', borderTop: '1px solid #dde6f0' }}>
+              {/* Legend pills */}
+              <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
+                <div>
+                  <span style={{ fontSize: 8.5, fontWeight: 700, color: '#4a6fa5', letterSpacing: 0.8, textTransform: 'uppercase', marginRight: 6 }}>Escrita:</span>
+                  {[['PS','Pré-silábico','#fee2e2','#b91c1c'],['S','Silábico','#fef3c7','#92400e'],['SA','Sil.-Alfabético','#dbeafe','#1d4ed8'],['A','Alfabético','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                    <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 8 }}>
+                      <span style={{ background: bg, color, fontSize: 8, fontWeight: 800, padding: '1px 4px', borderRadius: 3 }}>{code}</span>
+                      <span style={{ fontSize: 8.5, color: '#475569' }}>{name}</span>
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <span style={{ fontSize: 8.5, fontWeight: 700, color: '#4a6fa5', letterSpacing: 0.8, textTransform: 'uppercase', marginRight: 6 }}>Leitura:</span>
+                  {[['NL','Não Leu','#fee2e2','#b91c1c'],['LP','Leu Palavras','#fef3c7','#92400e'],['LF','Leu Frases','#dbeafe','#1d4ed8'],['LT','Leu Texto','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                    <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 8 }}>
+                      <span style={{ background: bg, color, fontSize: 8, fontWeight: 800, padding: '1px 4px', borderRadius: 3 }}>{code}</span>
+                      <span style={{ fontSize: 8.5, color: '#475569' }}>{name}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ borderTop: '1px solid #c8d8ec', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 8, color: '#94a3b8' }}>
+                  Documento gerado automaticamente pelo Sistema de Sondagem · {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+                <div style={{ display: 'flex', gap: 28 }}>
+                  {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(role => (
+                    <div key={role} style={{ textAlign: 'center' }}>
+                      <div style={{ borderBottom: '1.5px solid #0f2d55', marginBottom: 5, width: 120 }} />
+                      <div style={{ fontSize: 8.5, color: '#0f2d55', fontWeight: 700 }}>{role}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
