@@ -780,7 +780,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, true)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.pdf')
@@ -812,7 +812,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPDF(dashRef,
-                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`)}
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, false)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.pdf')
