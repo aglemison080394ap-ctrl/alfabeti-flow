@@ -476,17 +476,15 @@ const ReportsPage: React.FC = () => {
           alignItems: 'center',
           gap: 20,
         }}>
-          {/* School Logo */}
+          {/* School Logo — PNG sem fundo */}
           <img
             src={schoolLogo}
             alt="Logo E.M.E.F Roseli Paiva"
             style={{
-              width: 80, height: 80,
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '3px solid rgba(255,255,255,0.6)',
-              background: '#fff',
+              width: 96, height: 96,
+              objectFit: 'contain',
               flexShrink: 0,
+              filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
             }}
           />
 
