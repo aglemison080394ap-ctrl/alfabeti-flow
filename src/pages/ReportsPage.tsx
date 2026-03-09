@@ -196,7 +196,6 @@ const ReportsPage: React.FC = () => {
 
     const classData = classes.find(c => c.id === selectedClass);
 
-    // Fetch coordinator name directly from teachers table (set by teacher in their profile)
     let coordinatorName = '___________________';
     if (classData?.teacher_id) {
       const { data: teacherRow } = await supabase
@@ -236,20 +235,6 @@ const ReportsPage: React.FC = () => {
       return { bimestre: b, total, wC, rC };
     });
 
-    const latestB = [...bimestreStats].reverse().find(b => b.total > 0) || bimestreStats[0];
-
-    const writingChartData = Object.entries(latestB.wC).map(([key, value]) => ({
-      name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
-      value, color: WRITING_LEVELS[key].color,
-      pct: latestB.total > 0 ? Math.round((value / latestB.total) * 100) : 0,
-    }));
-
-    const readingChartData = Object.entries(latestB.rC).map(([key, value]) => ({
-      name: READING_LEVELS[key].label, short: READING_LEVELS[key].short,
-      value, color: READING_LEVELS[key].color,
-      pct: latestB.total > 0 ? Math.round((value / latestB.total) * 100) : 0,
-    }));
-
     const evolutionData = bimestreStats.map(b => ({
       name: `${b.bimestre}º Bim`,
       'Alfabético': b.total > 0 ? Math.round((b.wC.A  / b.total) * 100) : 0,
@@ -258,12 +243,36 @@ const ReportsPage: React.FC = () => {
 
     setReportData({
       classData, students: students || [], assessMap,
-      bimestreStats, writingChartData, readingChartData,
-      evolutionData, latestTotal: latestB.total, latestBimestre: latestB.bimestre,
+      bimestreStats,
+      evolutionData,
       coordinatorName,
     });
+    setSelectedBimestre('auto');
     setLoading(false);
   };
+
+  /* ── Compute chart data for selected bimestre ──────────────────── */
+  const activeBimestreData = React.useMemo(() => {
+    if (!reportData) return null;
+    const { bimestreStats } = reportData;
+    let activeB;
+    if (selectedBimestre === 'auto') {
+      activeB = [...bimestreStats].reverse().find((b: any) => b.total > 0) || bimestreStats[0];
+    } else {
+      activeB = bimestreStats.find((b: any) => b.bimestre === selectedBimestre) || bimestreStats[0];
+    }
+    const writingChartData = Object.entries(activeB.wC).map(([key, value]: [string, any]) => ({
+      name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
+      value, color: WRITING_LEVELS[key].color,
+      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+    }));
+    const readingChartData = Object.entries(activeB.rC).map(([key, value]: [string, any]) => ({
+      name: READING_LEVELS[key].label, short: READING_LEVELS[key].short,
+      value, color: READING_LEVELS[key].color,
+      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+    }));
+    return { activeB, writingChartData, readingChartData };
+  }, [reportData, selectedBimestre]);
 
   /* ── Print helper ─────────────────────────────────────────────── */
   const printSection = (sectionId: string) => {
