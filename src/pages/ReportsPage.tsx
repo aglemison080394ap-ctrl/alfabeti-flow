@@ -261,19 +261,20 @@ const ReportsPage: React.FC = () => {
     const { bimestreStats } = reportData;
     let activeB;
     if (selectedBimestre === 'auto') {
-      activeB = [...bimestreStats].reverse().find((b: any) => b.total > 0) || bimestreStats[0];
+      activeB = [...bimestreStats].reverse().find((b: any) => b.assessed > 0) || bimestreStats[0];
     } else {
       activeB = bimestreStats.find((b: any) => b.bimestre === selectedBimestre) || bimestreStats[0];
     }
+    // pct calculado sobre os avaliados (assessed), não o total da turma
     const writingChartData = Object.entries(activeB.wC).map(([key, value]: [string, any]) => ({
       name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
       value, color: WRITING_LEVELS[key].color,
-      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+      pct: activeB.assessed > 0 ? Math.round((value / activeB.assessed) * 100) : 0,
     }));
     const readingChartData = Object.entries(activeB.rC).map(([key, value]: [string, any]) => ({
       name: READING_LEVELS[key].label, short: READING_LEVELS[key].short,
       value, color: READING_LEVELS[key].color,
-      pct: activeB.total > 0 ? Math.round((value / activeB.total) * 100) : 0,
+      pct: activeB.assessed > 0 ? Math.round((value / activeB.assessed) * 100) : 0,
     }));
     return { activeB, writingChartData, readingChartData };
   }, [reportData, selectedBimestre]);
