@@ -12,7 +12,6 @@ const SetupPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [checking, setChecking] = useState(true);
-  const [adminExists, setAdminExists] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,18 +19,16 @@ const SetupPage: React.FC = () => {
 
   useEffect(() => {
     const check = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .limit(1);
-      if (!error && data && data.length > 0) {
-        setAdminExists(true);
+      const { data, error } = await supabase.rpc('has_any_admin');
+      if (!error && data === true) {
+        // Admin already exists — redirect away, nobody should see this page
+        navigate('/login', { replace: true });
+        return;
       }
       setChecking(false);
     };
     check();
-  }, []);
+  }, [navigate]);
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,25 +63,9 @@ const SetupPage: React.FC = () => {
     );
   }
 
-  if (adminExists) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="p-8 max-w-sm w-full text-center space-y-4 shadow-card">
-          <Shield className="w-10 h-10 text-primary mx-auto" />
-          <h1 className="text-xl font-display font-bold text-foreground">Sistema já configurado</h1>
-          <p className="text-muted-foreground text-sm">Um administrador já foi cadastrado. Faça login para acessar o sistema.</p>
-          <Button className="w-full gradient-primary text-primary-foreground rounded-xl" onClick={() => navigate('/login')}>
-            Ir para o Login
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Header */}
         <div className="text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg mx-auto">
             <BookOpen className="w-8 h-8 text-white" />
