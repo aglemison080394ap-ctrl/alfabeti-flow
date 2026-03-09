@@ -193,21 +193,37 @@ const ReportsPage: React.FC = () => {
     setLoading(true);
 
     const classData = classes.find(c => c.id === selectedClass);
+
+    // Fetch coordinator name directly from teachers table (set by teacher in their profile)
+    let coordinatorName = '___________________';
+    if (classData?.teacher_id) {
+      const { data: teacherRow } = await supabase
+        .from('teachers')
+        .select('coordinator_name')
+        .eq('id', classData.teacher_id)
+        .maybeSingle();
+      if (teacherRow?.coordinator_name) {
+        coordinatorName = teacherRow.coordinator_name;
+      }
+    }
+
     const { data: students } = await supabase
       .from('students').select('*').eq('class_id', selectedClass).order('name');
 
     const studentIds = students?.map(s => s.id) || [];
-    const { data: allAssessments } = await supabase
-      .from('assessments').select('*').in('student_id', studentIds);
+    const { data: rawAssessments } = studentIds.length > 0
+      ? await supabase.from('assessments').select('*').in('student_id', studentIds)
+      : { data: [] };
+    const finalAssessments = rawAssessments || [];
 
     const assessMap: Record<string, Record<string, any>> = {};
-    allAssessments?.forEach(a => {
+    finalAssessments.forEach(a => {
       if (!assessMap[a.student_id]) assessMap[a.student_id] = {};
       assessMap[a.student_id][a.bimestre] = a;
     });
 
     const bimestreStats = (['1','2','3','4'] as const).map(b => {
-      const bData = allAssessments?.filter(a => a.bimestre === b) || [];
+      const bData = finalAssessments.filter(a => a.bimestre === b);
       const total = bData.length;
       const wC = { PS: 0, S: 0, SA: 0, A: 0 };
       const rC = { NL: 0, LP: 0, LF: 0, LT: 0 };
@@ -237,10 +253,6 @@ const ReportsPage: React.FC = () => {
       'Alfabético': b.total > 0 ? Math.round((b.wC.A  / b.total) * 100) : 0,
       'Leu Texto':  b.total > 0 ? Math.round((b.rC.LT / b.total) * 100) : 0,
     }));
-
-    // Coordinator: only from teacher's own profile (teachers.coordinator_name)
-    // Never fall back to school_info.coordinator (that field was removed from the admin UI)
-    const coordinatorName = (classData as any)?.coordinator_name || '___________________';
 
     setReportData({
       classData, students: students || [], assessMap,
