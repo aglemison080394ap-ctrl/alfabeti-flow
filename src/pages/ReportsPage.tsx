@@ -428,58 +428,127 @@ const ReportsPage: React.FC = () => {
     setGenerating(null);
   };
 
-  /* ── Green table header ────────────────────────────────────────── */
-  const TableHeader = () => {
-    const coordinatorName = reportData?.coordinatorName || '___________________';
+  /* ── Spreadsheet table section ─────────────────────────────────── */
+  const SpreadsheetTable = () => {
+    const coordinatorName = reportData?.coordinatorName || '';
+    const teacherName     = reportData?.classData?.teachers?.name || '';
+    const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
+    // Always show at least 40 rows
+    const rows = [...(reportData?.students || [])];
+    while (rows.length < 40) rows.push(null);
+
     return (
-      <div className="px-6 py-4 border-b-4 border-green-800"
-        style={{ background: 'linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%)' }}>
-        <div className="flex items-center justify-between">
-          {/* School logo badge */}
-          <div className="w-16 h-16 rounded-xl bg-white/20 border-2 border-white/40 flex flex-col items-center justify-center shrink-0 text-center px-1">
-            <div className="text-white text-[7px] font-bold leading-tight">E.M.E.F</div>
-            <div className="text-green-200 text-[6px] leading-tight">ROSELI</div>
-            <div className="text-green-200 text-[6px] leading-tight">PAIVA</div>
-            <div className="text-green-300 text-[5px] leading-tight mt-0.5">Anajás-PA</div>
+      <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif', padding: '24px 20px' }}>
+        {/* Logo + Título */}
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{
+            width: 80, height: 80, margin: '0 auto 8px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #1a6b3a 0%, #2ea05a 100%)',
+            border: '3px solid #2ea05a',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{ color: '#fff', fontSize: 9, fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>
+              E.M.E.F<br/>
+              <span style={{ fontSize: 7, fontWeight: 700 }}>ROSELI<br/>PAIVA</span>
+            </div>
           </div>
-          <div className="text-center flex-1 px-4">
-            <p className="text-green-200 text-xs uppercase tracking-widest">SECRETARIA MUNICIPAL DE EDUCAÇÃO</p>
-            <h1 className="text-white font-bold text-xl leading-tight mt-0.5" style={{ fontFamily: 'Nunito, sans-serif' }}>
-              {schoolInfo.name}
-            </h1>
-            <p className="text-green-200 text-sm">{schoolInfo.city}</p>
-            <p className="text-white font-bold text-sm mt-1 uppercase tracking-wide">
-              PLANILHA DE RESULTADOS DA SONDAGEM
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-green-200 text-xs">ANO LETIVO</p>
-            <p className="text-white text-2xl font-bold" style={{ fontFamily: 'Nunito, sans-serif' }}>
-              {reportData?.classData?.school_year || schoolInfo.active_school_year}
-            </p>
-            <p className="text-green-200 text-xs mt-1">{new Date().toLocaleDateString('pt-BR')}</p>
+          <div style={{ fontWeight: 900, fontSize: 13, letterSpacing: 0.5, color: '#111', textTransform: 'uppercase' }}>
+            PLANILHA DE RESULTADOS DA SONDAGEM DE LEITURA E ESCRITA DA TURMA
           </div>
         </div>
-        {/* Meta row */}
-        <div className="mt-3 flex flex-wrap gap-4 bg-white/10 rounded-xl px-4 py-2 text-sm">
-          <div>
-            <span className="text-green-200 text-xs uppercase tracking-wide">Turma: </span>
-            <span className="text-white font-bold">
-              {reportData?.classData?.grade_year} {reportData?.classData?.class_letter}
-            </span>
-          </div>
-          <div>
-            <span className="text-green-200 text-xs uppercase tracking-wide">Professor(a): </span>
-            <span className="text-white font-bold">{reportData?.classData?.teachers?.name || '___________________'}</span>
-          </div>
-          <div>
-            <span className="text-green-200 text-xs uppercase tracking-wide">Coordenador(a): </span>
-            <span className="text-white font-bold">{coordinatorName}</span>
-          </div>
-          <div>
-            <span className="text-green-200 text-xs uppercase tracking-wide">Total de Alunos: </span>
-            <span className="text-white font-bold">{reportData?.students?.length}</span>
-          </div>
+
+        {/* Info header row */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0, fontSize: 11 }}>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700, width: '35%' }}>
+                PROFESSOR: <span style={{ fontWeight: 400 }}>{teacherName}</span>
+              </td>
+              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700 }}>
+                COORDENADOR/A: <span style={{ fontWeight: 400 }}>{coordinatorName}</span>
+              </td>
+              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700, width: '18%' }}>
+                TURMA: <span style={{ fontWeight: 400 }}>{turma}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Main data table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <thead>
+            <tr>
+              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 3px', textAlign: 'center', width: 30, verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>Nº</th>
+              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>ALUNO/A</th>
+              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 3px', textAlign: 'center', width: 38, verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>IDADE</th>
+              <th colSpan={12} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>BIMESTRE</th>
+            </tr>
+            <tr>
+              {['1º BIMESTRE','2º BIMESTRE','3º BIMESTRE','4º BIMESTRE'].map(b => (
+                <th key={b} colSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 4px', textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{b}</th>
+              ))}
+            </tr>
+            <tr>
+              {[1,2,3,4].map(b => (
+                <React.Fragment key={b}>
+                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>ESCRITA</th>
+                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>LEITURA</th>
+                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>FALTAS</th>
+                </React.Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((student: any, idx: number) => {
+              const bg = idx % 2 === 0 ? '#ffffff' : '#ddeef7';
+              return (
+                <tr key={idx} style={{ background: bg }}>
+                  <td style={{ border: '1px solid #bbb', padding: '3px 4px', textAlign: 'center', fontWeight: 700, fontSize: 10, color: '#333' }}>
+                    {String(idx + 1).padStart(2, '0')}
+                  </td>
+                  <td style={{ border: '1px solid #bbb', padding: '3px 6px', fontSize: 10, color: '#111' }}>
+                    {student?.name || ''}
+                  </td>
+                  <td style={{ border: '1px solid #bbb', padding: '3px 4px', textAlign: 'center', fontSize: 10, color: '#333' }}>
+                    {student?.age || ''}
+                  </td>
+                  {(['1','2','3','4'] as const).map(b => {
+                    const a = student ? reportData?.assessMap[student.id]?.[b] : null;
+                    return (
+                      <React.Fragment key={b}>
+                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#222' }}>
+                          {a?.writing_level || ''}
+                        </td>
+                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#222' }}>
+                          {a?.reading_level || ''}
+                        </td>
+                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, color: '#333' }}>
+                          {a != null ? (a.absences ?? 0) : ''}
+                        </td>
+                      </React.Fragment>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Legend */}
+        <div style={{ marginTop: 12, fontSize: 9, color: '#444', borderTop: '1px solid #ccc', paddingTop: 6 }}>
+          <strong>Escrita:</strong> PS = Pré-silábico &nbsp;|&nbsp; S = Silábico &nbsp;|&nbsp; SA = Silábico-Alfabético &nbsp;|&nbsp; A = Alfabético &nbsp;&nbsp;&nbsp;
+          <strong>Leitura:</strong> NL = Não Leu &nbsp;|&nbsp; LP = Leu Palavras &nbsp;|&nbsp; LF = Leu Frases &nbsp;|&nbsp; LT = Leu Texto
+        </div>
+
+        {/* Signatures */}
+        <div style={{ marginTop: 28, display: 'flex', gap: 40 }}>
+          {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(r => (
+            <div key={r} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: '#333' }}>
+              <div style={{ borderTop: '1px solid #555', paddingTop: 4 }}>{r}</div>
+            </div>
+          ))}
         </div>
       </div>
     );
