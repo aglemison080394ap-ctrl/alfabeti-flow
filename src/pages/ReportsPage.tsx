@@ -702,23 +702,109 @@ const ReportsPage: React.FC = () => {
     );
   };
 
-  /* ── Clean dashboard header (title + class + bimestre only) ─────── */
-  const DashHeader = () => (
-    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">Dashboard de Resultados</p>
-        <h2 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Nunito, sans-serif' }}>
-          {reportData?.classData?.grade_year} {reportData?.classData?.class_letter}
-        </h2>
+  /* ── Professional Dashboard Export Header ─────────────────────── */
+  const DashHeader = () => {
+    const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
+    const teacher  = reportData?.classData?.teachers?.name || '';
+    const today    = new Date().toLocaleDateString('pt-BR');
+    const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
+
+    const statsCards = [
+      { label: 'Total de Alunos',    value: reportData?.students?.length ?? 0,  color: '#0f2d55', bg: '#e8f0fb' },
+      { label: 'Avaliados',          value: reportData?.latestTotal ?? 0,        color: '#15803d', bg: '#dcfce7' },
+      { label: 'Não Avaliados',      value: (reportData?.students?.length ?? 0) - (reportData?.latestTotal ?? 0), color: '#b45309', bg: '#fef3c7' },
+      { label: `${reportData?.latestBimestre}º Bimestre`, value: 'Atual', color: '#1d4ed8', bg: '#dbeafe' },
+    ];
+
+    return (
+      <div style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
+        {/* ── Top gradient band ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
+          padding: '20px 28px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+        }}>
+          <img
+            src={schoolLogo}
+            alt="Logo"
+            style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))' }}
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 8.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
+              Secretaria Municipal de Educação
+            </div>
+            <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
+              {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9.5, marginTop: 3 }}>
+              {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYr}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 8,
+            padding: '10px 16px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 }}>Documento Oficial</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Dashboard de Resultados</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Sondagem</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 4 }}>{today}</div>
+          </div>
+        </div>
+
+        {/* ── Meta row ── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '3px solid #0f2d55',
+          background: '#f0f5fc',
+        }}>
+          {[
+            { label: 'PROFESSOR(A)',       value: teacher },
+            { label: 'TURMA',              value: turma },
+            { label: 'COORDENADOR(A)',     value: reportData?.coordinatorName || '' },
+            { label: 'DATA DE EMISSÃO',    value: today },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: i === 0 || i === 2 ? 2 : 1,
+              padding: '8px 14px',
+              borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
+            }}>
+              <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>
+                {item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Stats cards row ── */}
+        <div style={{ display: 'flex', gap: 0, background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
+          {statsCards.map((s, i) => (
+            <div key={i} style={{
+              flex: 1,
+              background: s.bg,
+              border: `1px solid ${s.color}30`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              textAlign: 'center',
+            }}>
+              <div style={{ color: s.color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>
+                {s.value}
+              </div>
+              <div style={{ color: s.color, fontSize: 8.5, fontWeight: 600, marginTop: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="text-right">
-        <span className="inline-block bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1 rounded-full">
-          {reportData?.latestBimestre}º Bimestre
-        </span>
-        <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleDateString('pt-BR')}</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   /* ── JSX ─────────────────────────────────────────────────────── */
   return (
