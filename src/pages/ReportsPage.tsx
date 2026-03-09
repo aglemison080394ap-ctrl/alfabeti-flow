@@ -284,49 +284,45 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── High-quality capture helper ─────────────────────────────── */
-  const captureElement = async (el: HTMLDivElement): Promise<HTMLCanvasElement> => {
+  // exportWidth: px width used to render (portrait ≈ 900, landscape ≈ 1440)
+  const captureElement = async (
+    el: HTMLDivElement,
+    exportWidth = 1440,
+  ): Promise<HTMLCanvasElement> => {
     const html2canvas = (await import('html2canvas')).default;
 
-    // 1. Collect live SVG dimensions BEFORE cloning (getBoundingClientRect works here)
     const svgSizeMap = new Map<SVGElement, { w: number; h: number }>();
     el.querySelectorAll<SVGElement>('svg').forEach(svg => {
       const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
+      if (r.width > 0 && r.height > 0)
         svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
-      }
     });
 
-    // 2. Snapshot styles
     const prev = {
       width: el.style.width, maxWidth: el.style.maxWidth,
       overflow: el.style.overflow, position: el.style.position,
       transform: el.style.transform,
     };
 
-    // 3. Expand to fixed width so Recharts fills properly
-    const EXPORT_W = 1440;
-    el.style.width     = `${EXPORT_W}px`;
+    el.style.width     = `${exportWidth}px`;
     el.style.maxWidth  = 'none';
     el.style.overflow  = 'visible';
     el.style.position  = 'relative';
     el.style.transform = 'none';
 
-    // 4. Wait for Recharts ResizableContainers to re-render
     await new Promise(r => setTimeout(r, 800));
 
-    // Re-collect SVG sizes after resize (now they may be bigger)
     el.querySelectorAll<SVGElement>('svg').forEach(svg => {
       const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
+      if (r.width > 0 && r.height > 0)
         svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
-      }
     });
 
     const W = el.scrollWidth;
     const H = el.scrollHeight;
 
     const canvas = await html2canvas(el, {
-      scale: 4,                   // 4× = ~300 DPI on screen → HD export
+      scale: 4,
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false,
@@ -338,7 +334,6 @@ const ReportsPage: React.FC = () => {
       x: 0,
       y: 0,
       onclone: (_doc: Document, clonedEl: HTMLElement) => {
-        // Apply pre-collected sizes to cloned SVGs
         const clonedSvgs = clonedEl.querySelectorAll<SVGElement>('svg');
         const origSvgs   = el.querySelectorAll<SVGElement>('svg');
         clonedSvgs.forEach((clonedSvg, i) => {
@@ -352,28 +347,25 @@ const ReportsPage: React.FC = () => {
             clonedSvg.style.height = `${dims.h}px`;
           }
         });
-        // Flatten all transforms so nothing shifts
         clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => {
           node.style.transform = 'none';
         });
-        // Ensure font smoothing (cast to any to bypass TS strict CSSStyleDeclaration)
         (clonedEl as any).style['font-smooth'] = 'always';
         (clonedEl as any).style['-webkit-font-smoothing'] = 'antialiased';
       },
     });
 
-    // 5. Restore styles
     Object.assign(el.style, prev);
-
     return canvas;
   };
 
   /* ── PNG Export ───────────────────────────────────────────────── */
-  const handleDownloadPNG = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+  const handleDownloadPNG = async (ref: React.RefObject<HTMLDivElement>, filename: string, isSpreadsheet = false) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const canvas = await captureElement(ref.current);
+      // Portrait spreadsheet captured at A4-proportional width (~900px)
+      const canvas = await captureElement(ref.current, isSpreadsheet ? 900 : 1440);
       const link   = document.createElement('a');
       link.download = filename.replace(/\.(jpg|jpeg|pdf)$/i, '.png');
       link.href     = canvas.toDataURL('image/png');
@@ -387,7 +379,8 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── PDF Export ───────────────────────────────────────────────── */
-  // isSpreadsheet=true → A4 retrato | false → A4 paisagem
+  // isSpreadsheet=true → A4 retrato (preenche a página toda)
+  // isSpreadsheet=false → A4 paisagem
   const handleDownloadPDF = async (
     ref: React.RefObject<HTMLDivElement>,
     filename: string,
@@ -396,10 +389,12 @@ const ReportsPage: React.FC = () => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
-      const canvas    = await captureElement(ref.current);
+      // For portrait spreadsheet, capture at ~900px width (A4 portrait proportions)
+      // so the image ratio naturally fits a portrait page
+      const exportWidth = isSpreadsheet ? 900 : 1440;
+      const canvas    = await captureElement(ref.current, exportWidth);
       const { jsPDF } = await import('jspdf');
 
-      // Force orientation: spreadsheet=portrait, charts=landscape
       const landscape = !isSpreadsheet;
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
@@ -411,16 +406,23 @@ const ReportsPage: React.FC = () => {
         compress: false,
       });
 
-      const margin  = 6;
-      const maxW    = pdfW - margin * 2;
-      const maxH    = pdfH - margin * 2;
-      const imgRatio = canvas.height / canvas.width;
-      const drawW   = Math.min(maxW, maxH / imgRatio);
-      const drawH   = drawW * imgRatio;
-      const offsetX = margin + (maxW - drawW) / 2;
-      const offsetY = margin + (maxH - drawH) / 2;
+      // For spreadsheet: stretch to fill the FULL page (no margins, no gaps)
+      // For charts: 5mm margin, contain within page
+      if (isSpreadsheet) {
+        // Fill entire A4 portrait page edge-to-edge
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
+      } else {
+        const margin   = 5;
+        const maxW     = pdfW - margin * 2;
+        const maxH     = pdfH - margin * 2;
+        const imgRatio = canvas.height / canvas.width;
+        const drawW    = Math.min(maxW, maxH / imgRatio);
+        const drawH    = drawW * imgRatio;
+        const offsetX  = margin + (maxW - drawW) / 2;
+        const offsetY  = margin + (maxH - drawH) / 2;
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
+      }
 
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, offsetY, drawW, drawH);
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
       toast({ title: '✅ PDF exportado em alta qualidade!' });
     } catch (e) {
@@ -768,7 +770,7 @@ const ReportsPage: React.FC = () => {
                 variant="outline" size="sm"
                 disabled={!!generating}
                 onClick={() => handleDownloadPNG(tableRef,
-                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`)}
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`, true)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.png')
