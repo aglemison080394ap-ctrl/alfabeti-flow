@@ -433,122 +433,268 @@ const ReportsPage: React.FC = () => {
     const coordinatorName = reportData?.coordinatorName || '';
     const teacherName     = reportData?.classData?.teachers?.name || '';
     const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
-    // Always show at least 40 rows
+    const schoolYear      = schoolInfo.active_school_year || new Date().getFullYear();
+    const today           = new Date().toLocaleDateString('pt-BR');
+
+    // Always show at least 35 rows
     const rows = [...(reportData?.students || [])];
-    while (rows.length < 40) rows.push(null);
+    while (rows.length < 35) rows.push(null);
+
+    // Color maps for level cells
+    const writingColors: Record<string, { bg: string; color: string }> = {
+      PS: { bg: '#fee2e2', color: '#b91c1c' },
+      S:  { bg: '#fef3c7', color: '#92400e' },
+      SA: { bg: '#dbeafe', color: '#1d4ed8' },
+      A:  { bg: '#dcfce7', color: '#15803d' },
+    };
+    const readingColors: Record<string, { bg: string; color: string }> = {
+      NL: { bg: '#fee2e2', color: '#b91c1c' },
+      LP: { bg: '#fef3c7', color: '#92400e' },
+      LF: { bg: '#dbeafe', color: '#1d4ed8' },
+      LT: { bg: '#dcfce7', color: '#15803d' },
+    };
+
+    // Header colors per bimestre
+    const bimColors = ['#1e3a5f', '#1e4d6b', '#1a5276', '#154360'];
+    const bimLight  = ['#e8f0f9', '#e3eff7', '#ddeef8', '#d8ecf5'];
 
     return (
-      <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif', padding: '24px 20px' }}>
-        {/* Logo + Título */}
-        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+      <div style={{
+        background: '#fff',
+        fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        padding: '0',
+        width: '100%',
+      }}>
+
+        {/* ── Header band ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
+          padding: '20px 28px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+        }}>
+          {/* Emblem */}
           <div style={{
-            width: 80, height: 80, margin: '0 auto 8px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #1a6b3a 0%, #2ea05a 100%)',
-            border: '3px solid #2ea05a',
+            width: 68, height: 68, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.15)',
+            border: '2px solid rgba(255,255,255,0.4)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <div style={{ color: '#fff', fontSize: 9, fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>
+            <div style={{ color: '#fff', fontSize: 7.5, fontWeight: 900, lineHeight: 1.2, textAlign: 'center', letterSpacing: 0.3 }}>
               E.M.E.F<br/>
-              <span style={{ fontSize: 7, fontWeight: 700 }}>ROSELI<br/>PAIVA</span>
+              <span style={{ fontSize: 6.5 }}>ROSELI<br/>PAIVA</span>
             </div>
           </div>
-          <div style={{ fontWeight: 900, fontSize: 13, letterSpacing: 0.5, color: '#111', textTransform: 'uppercase' }}>
-            PLANILHA DE RESULTADOS DA SONDAGEM DE LEITURA E ESCRITA DA TURMA
+
+          {/* School info */}
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 9, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
+              Secretaria Municipal de Educação
+            </div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
+              {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9.5, marginTop: 2 }}>
+              {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYear}
+            </div>
+          </div>
+
+          {/* Document title badge */}
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Documento Oficial</div>
+            <div style={{ color: '#fff', fontSize: 10, fontWeight: 800, marginTop: 2 }}>Sondagem de Leitura</div>
+            <div style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>e Escrita</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 3 }}>{today}</div>
           </div>
         </div>
 
-        {/* Info header row */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0, fontSize: 11 }}>
-          <tbody>
-            <tr>
-              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700, width: '35%' }}>
-                PROFESSOR: <span style={{ fontWeight: 400 }}>{teacherName}</span>
-              </td>
-              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700 }}>
-                COORDENADOR/A: <span style={{ fontWeight: 400 }}>{coordinatorName}</span>
-              </td>
-              <td style={{ border: '1px solid #333', padding: '5px 8px', fontWeight: 700, width: '18%' }}>
-                TURMA: <span style={{ fontWeight: 400 }}>{turma}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Main data table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-          <thead>
-            <tr>
-              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 3px', textAlign: 'center', width: 30, verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>Nº</th>
-              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 6px', textAlign: 'center', verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>ALUNO/A</th>
-              <th rowSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px 3px', textAlign: 'center', width: 38, verticalAlign: 'middle', fontSize: 10, fontWeight: 700 }}>IDADE</th>
-              <th colSpan={12} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '4px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>BIMESTRE</th>
-            </tr>
-            <tr>
-              {['1º BIMESTRE','2º BIMESTRE','3º BIMESTRE','4º BIMESTRE'].map(b => (
-                <th key={b} colSpan={3} style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 4px', textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{b}</th>
-              ))}
-            </tr>
-            <tr>
-              {[1,2,3,4].map(b => (
-                <React.Fragment key={b}>
-                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>ESCRITA</th>
-                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>LEITURA</th>
-                  <th style={{ border: '1px solid #333', background: '#d6e4f0', padding: '3px 2px', textAlign: 'center', fontSize: 9, fontWeight: 700 }}>FALTAS</th>
-                </React.Fragment>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((student: any, idx: number) => {
-              const bg = idx % 2 === 0 ? '#ffffff' : '#ddeef7';
-              return (
-                <tr key={idx} style={{ background: bg }}>
-                  <td style={{ border: '1px solid #bbb', padding: '3px 4px', textAlign: 'center', fontWeight: 700, fontSize: 10, color: '#333' }}>
-                    {String(idx + 1).padStart(2, '0')}
-                  </td>
-                  <td style={{ border: '1px solid #bbb', padding: '3px 6px', fontSize: 10, color: '#111' }}>
-                    {student?.name || ''}
-                  </td>
-                  <td style={{ border: '1px solid #bbb', padding: '3px 4px', textAlign: 'center', fontSize: 10, color: '#333' }}>
-                    {student?.age || ''}
-                  </td>
-                  {(['1','2','3','4'] as const).map(b => {
-                    const a = student ? reportData?.assessMap[student.id]?.[b] : null;
-                    return (
-                      <React.Fragment key={b}>
-                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#222' }}>
-                          {a?.writing_level || ''}
-                        </td>
-                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#222' }}>
-                          {a?.reading_level || ''}
-                        </td>
-                        <td style={{ border: '1px solid #bbb', padding: '3px 2px', textAlign: 'center', fontSize: 10, color: '#333' }}>
-                          {a != null ? (a.absences ?? 0) : ''}
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {/* Legend */}
-        <div style={{ marginTop: 12, fontSize: 9, color: '#444', borderTop: '1px solid #ccc', paddingTop: 6 }}>
-          <strong>Escrita:</strong> PS = Pré-silábico &nbsp;|&nbsp; S = Silábico &nbsp;|&nbsp; SA = Silábico-Alfabético &nbsp;|&nbsp; A = Alfabético &nbsp;&nbsp;&nbsp;
-          <strong>Leitura:</strong> NL = Não Leu &nbsp;|&nbsp; LP = Leu Palavras &nbsp;|&nbsp; LF = Leu Frases &nbsp;|&nbsp; LT = Leu Texto
-        </div>
-
-        {/* Signatures */}
-        <div style={{ marginTop: 28, display: 'flex', gap: 40 }}>
-          {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(r => (
-            <div key={r} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: '#333' }}>
-              <div style={{ borderTop: '1px solid #555', paddingTop: 4 }}>{r}</div>
+        {/* ── Meta row ── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '3px solid #0f2d55',
+          background: '#f0f5fc',
+        }}>
+          {[
+            { label: 'PROFESSOR(A)', value: teacherName },
+            { label: 'COORDENADOR(A)', value: coordinatorName },
+            { label: 'TURMA', value: turma },
+            { label: 'ANO LETIVO', value: String(schoolYear) },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: i === 0 || i === 1 ? 2 : 1,
+              padding: '8px 14px',
+              borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
+            }}>
+              <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>{item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── Main table ── */}
+        <div style={{ padding: '0 0 20px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+            <thead>
+              {/* Row 1: column groups */}
+              <tr>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 4px', textAlign: 'center',
+                  width: 28, verticalAlign: 'middle',
+                  fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                }}>Nº</th>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 10px', textAlign: 'left',
+                  minWidth: 160, verticalAlign: 'middle',
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                }}>NOME DO ALUNO(A)</th>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 4px', textAlign: 'center',
+                  width: 40, verticalAlign: 'middle',
+                  fontSize: 9, fontWeight: 700,
+                }}>IDADE</th>
+                {['1º BIMESTRE','2º BIMESTRE','3º BIMESTRE','4º BIMESTRE'].map((b, i) => (
+                  <th key={b} colSpan={3} style={{
+                    background: bimColors[i], color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    padding: '6px 4px', textAlign: 'center',
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+                  }}>{b}</th>
+                ))}
+              </tr>
+              {/* Row 2: sub-columns per bimestre */}
+              <tr>
+                {[0,1,2,3].map(i => (
+                  <React.Fragment key={i}>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>ESCRITA</th>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>LEITURA</th>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>FALTAS</th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((student: any, idx: number) => {
+                const isEven = idx % 2 === 0;
+                const rowBg  = isEven ? '#ffffff' : '#f4f8fd';
+                return (
+                  <tr key={idx} style={{ background: rowBg }}>
+                    {/* Nº */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 3px',
+                      textAlign: 'center', fontSize: 9.5, fontWeight: 700, color: '#4a6fa5',
+                    }}>{String(idx + 1).padStart(2, '0')}</td>
+                    {/* Name */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 10px',
+                      fontSize: 10, color: '#0f2d55', fontWeight: student ? 500 : 400,
+                      borderLeft: '3px solid #0f2d55',
+                    }}>{student?.name || ''}</td>
+                    {/* Age */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 3px',
+                      textAlign: 'center', fontSize: 10, color: '#374151',
+                    }}>{student?.age || ''}</td>
+                    {/* Bimestres */}
+                    {(['1','2','3','4'] as const).map((b, bi) => {
+                      const a  = student ? reportData?.assessMap[student.id]?.[b] : null;
+                      const wl = a?.writing_level || '';
+                      const rl = a?.reading_level || '';
+                      const wStyle = wl ? writingColors[wl] : null;
+                      const rStyle = rl ? readingColors[rl] : null;
+                      return (
+                        <React.Fragment key={b}>
+                          <td style={{
+                            border: '1px solid #dde6f0',
+                            borderLeft: `2px solid ${bimColors[bi]}40`,
+                            padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700,
+                            background: wStyle ? wStyle.bg : rowBg,
+                            color: wStyle ? wStyle.color : '#9ca3af',
+                          }}>{wl}</td>
+                          <td style={{
+                            border: '1px solid #dde6f0', padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700,
+                            background: rStyle ? rStyle.bg : rowBg,
+                            color: rStyle ? rStyle.color : '#9ca3af',
+                          }}>{rl}</td>
+                          <td style={{
+                            border: '1px solid #dde6f0',
+                            borderRight: `2px solid ${bimColors[bi]}40`,
+                            padding: '3px 2px', textAlign: 'center', fontSize: 10, color: '#374151',
+                            background: a?.absences > 0 ? '#fff7ed' : rowBg,
+                            fontWeight: a?.absences > 0 ? 700 : 400,
+                          }}>{a != null ? (a.absences ?? 0) : ''}</td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Legend + Signatures ── */}
+        <div style={{ padding: '0 0 24px', margin: '0 0 0 0' }}>
+          {/* Legend box */}
+          <div style={{
+            margin: '0 0 20px',
+            background: '#f0f5fc',
+            border: '1px solid #c8d8ec',
+            borderRadius: 6,
+            padding: '10px 14px',
+            display: 'flex',
+            gap: 32,
+            flexWrap: 'wrap' as const,
+          }}>
+            <div>
+              <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Escrita</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['PS','Pré-silábico','#fee2e2','#b91c1c'],['S','Silábico','#fef3c7','#92400e'],['SA','Sil.-Alfabético','#dbeafe','#1d4ed8'],['A','Alfabético','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                  <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
+                    <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Leitura</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['NL','Não Leu','#fee2e2','#b91c1c'],['LP','Leu Palavras','#fef3c7','#92400e'],['LF','Leu Frases','#dbeafe','#1d4ed8'],['LT','Leu Texto','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                  <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
+                    <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Signatures */}
+          <div style={{ display: 'flex', gap: 32, padding: '0 4px' }}>
+            {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(role => (
+              <div key={role} style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ borderBottom: '1.5px solid #0f2d55', marginBottom: 6, height: 32 }} />
+                <div style={{ fontSize: 9, color: '#0f2d55', fontWeight: 700, letterSpacing: 0.3 }}>{role}</div>
+                <div style={{ fontSize: 8, color: '#9ca3af', marginTop: 1 }}>Assinatura / Carimbo</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
