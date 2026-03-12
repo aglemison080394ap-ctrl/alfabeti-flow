@@ -30,50 +30,50 @@ const App = () => (
         <AuthProvider>
           <ErrorBoundary>
             <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            
-            <Route path="/" element={
-              <ProtectedRoute>
-                <AppLayout><Dashboard /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/professores" element={
-              <ProtectedRoute adminOnly>
-                <AppLayout><TeachersPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/turmas" element={
-              <ProtectedRoute>
-                <AppLayout><ClassesPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/alunos" element={
-              <ProtectedRoute>
-                <AppLayout><StudentsPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/sondagens" element={
-              <ProtectedRoute>
-                <AppLayout><AssessmentsPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/relatorios" element={
-              <ProtectedRoute>
-                <AppLayout><ReportsPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/configuracoes" element={
-              <ProtectedRoute adminOnly>
-                <AppLayout><SettingsPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/meu-perfil" element={
-              <ProtectedRoute>
-                <AppLayout><TeacherProfilePage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <AppLayout><Dashboard /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/professores" element={
+                <ProtectedRoute adminOnly>
+                  <AppLayout><TeachersPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/turmas" element={
+                <ProtectedRoute>
+                  <AppLayout><ClassesPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/alunos" element={
+                <ProtectedRoute>
+                  <AppLayout><StudentsPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/sondagens" element={
+                <ProtectedRoute>
+                  <AppLayout><AssessmentsPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/relatorios" element={
+                <ProtectedRoute>
+                  <AppLayout><ReportsPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/configuracoes" element={
+                <ProtectedRoute adminOnly>
+                  <AppLayout><SettingsPage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/meu-perfil" element={
+                <ProtectedRoute>
+                  <AppLayout><TeacherProfilePage /></AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
