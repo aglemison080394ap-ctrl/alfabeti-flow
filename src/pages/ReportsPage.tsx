@@ -59,9 +59,9 @@ function absenceTotal(assessMap: Record<string, any>, students: any[], b: string
 }
 
 /* ── Fat Donut for reports ────────────────────────────────────────── */
-const DonutSection: React.FC<{
+const DonutSection = React.memo(({ title, icon: Icon, data, total }: {
   title: string; icon: React.ElementType; data: any[]; total: number;
-}> = React.memo(({ title, icon: Icon, data, total }) => {
+}) => {
   return (
     <div className="flex gap-3">
       {/* Left stat cards */}
@@ -112,18 +112,18 @@ const DonutSection: React.FC<{
               {data.map(item => (
                 <div key={item.short} className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-[9px] text-gray-500">{item.short} – {item.name}</span>
+                  <span className="text-[9px] text-muted-foreground">{item.short} – {item.name}</span>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          <div className="h-36 flex items-center justify-center text-gray-400 text-xs">Sem dados</div>
+          <div className="h-36 flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
         )}
       </div>
     </div>
   );
-};
+});
 
 /* ══════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
