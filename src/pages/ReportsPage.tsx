@@ -722,7 +722,12 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolI
   };
 
   /* ── Professional Dashboard Export Header ─────────────────────── */
-  const DashHeader = () => {
+  interface DashHeaderProps {
+    reportData: any;
+    schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
+    activeBimestreData: { activeB: any } | null;
+  }
+  const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeBimestreData }) => {
     const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
     const teacher  = reportData?.classData?.teachers?.name || '';
     const today    = new Date().toLocaleDateString('pt-BR');
