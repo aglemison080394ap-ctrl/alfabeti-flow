@@ -986,7 +986,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolI
             style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}
           >
             {/* Professional header with logo + meta + stats */}
-            <DashHeader />
+            <DashHeader reportData={reportData} schoolInfo={schoolInfo} activeBimestreData={activeBimestreData} />
 
             {/* Charts area */}
             <div style={{ padding: '20px 24px 0', background: '#f8fafc' }}>
