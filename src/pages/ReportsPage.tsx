@@ -1038,12 +1038,7 @@ const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeB
                         <PieChart>
                           <Pie data={activeBimestreData?.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-                              if (percent < 0.05) return null;
-                              const R = Math.PI / 180;
-                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
-                            }}
+                            label={renderPieLabel}
                           >
                             {activeBimestreData?.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
