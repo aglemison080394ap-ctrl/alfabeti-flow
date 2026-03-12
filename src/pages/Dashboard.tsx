@@ -90,12 +90,7 @@ const Dashboard: React.FC = () => {
     return filtered.map(c => c.id);
   })();
 
-  useEffect(() => {
-    fetchDashboardData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = React.useCallback(async () => {
     setLoading(true);
     try {
       let classFilter: string[];
@@ -186,7 +181,12 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   // ── Donut Card ─────────────────────────────────────────────────────────────
   const DonutCard = ({

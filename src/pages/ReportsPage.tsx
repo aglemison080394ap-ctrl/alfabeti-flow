@@ -448,8 +448,12 @@ const ReportsPage: React.FC = () => {
     setGenerating(null);
   };
 
-  /* ── Spreadsheet table section ─────────────────────────────────── */
-  const SpreadsheetTable = () => {
+/* ── Spreadsheet table section ─────────────────────────────────── */
+interface SpreadsheetTableProps {
+  reportData: any;
+  schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
+}
+const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolInfo }) => {
     const coordinatorName = reportData?.coordinatorName || '';
     const teacherName     = reportData?.classData?.teachers?.name || '';
     const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
@@ -717,8 +721,13 @@ const ReportsPage: React.FC = () => {
     );
   };
 
-  /* ── Professional Dashboard Export Header ─────────────────────── */
-  const DashHeader = () => {
+/* ── Professional Dashboard Export Header ─────────────────────── */
+interface DashHeaderProps {
+  reportData: any;
+  schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
+  activeBimestreData: { activeB: any } | null;
+}
+const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeBimestreData }) => {
     const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
     const teacher  = reportData?.classData?.teachers?.name || '';
     const today    = new Date().toLocaleDateString('pt-BR');
@@ -822,7 +831,7 @@ const ReportsPage: React.FC = () => {
         </div>
       </div>
     );
-  };
+};
 
   /* ── JSX ─────────────────────────────────────────────────────── */
   return (
@@ -964,7 +973,7 @@ const ReportsPage: React.FC = () => {
             className="print-section bg-white rounded-2xl overflow-hidden border border-border shadow-card"
             ref={tableRef}
           >
-            <SpreadsheetTable />
+            <SpreadsheetTable reportData={reportData} schoolInfo={schoolInfo} />
           </div>
 
           {/* ════════════════════════════════════════════════
@@ -977,7 +986,7 @@ const ReportsPage: React.FC = () => {
             style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}
           >
             {/* Professional header with logo + meta + stats */}
-            <DashHeader />
+            <DashHeader reportData={reportData} schoolInfo={schoolInfo} activeBimestreData={activeBimestreData} />
 
             {/* Charts area */}
             <div style={{ padding: '20px 24px 0', background: '#f8fafc' }}>
