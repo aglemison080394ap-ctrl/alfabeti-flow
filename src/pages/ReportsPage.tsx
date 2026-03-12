@@ -8,10 +8,24 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, FileDown } from 'lucide-react';
+import { FileImage, BarChart3, Printer, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+
+/* ── Stable pie label renderer (defined outside component to avoid re-render loops) ── */
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  if (percent < 0.05) return null;
+  const R = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * R);
+  const y = cy + r * Math.sin(-midAngle * R);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {`${Math.round(percent * 100)}%`}
+    </text>
+  );
+};
 
 /* ── Level config ─────────────────────────────────────────────────── */
 const WRITING_LEVELS: Record<string, { label: string; color: string; short: string }> = {
@@ -45,42 +59,30 @@ function absenceTotal(assessMap: Record<string, any>, students: any[], b: string
 }
 
 /* ── Fat Donut for reports ────────────────────────────────────────── */
-const DonutSection: React.FC<{
+const DonutSection = React.memo(({ title, icon: Icon, data, total }: {
   title: string; icon: React.ElementType; data: any[]; total: number;
-}> = ({ title, icon: Icon, data, total }) => {
-  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-    if (percent < 0.05) return null;
-    const R = Math.PI / 180;
-    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + r * Math.cos(-midAngle * R);
-    const y = cy + r * Math.sin(-midAngle * R);
-    return (
-      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
-        {`${Math.round(percent * 100)}%`}
-      </text>
-    );
-  };
+}) => {
   return (
     <div className="flex gap-3">
       {/* Left stat cards */}
       <div className="flex flex-col gap-1.5 w-28 shrink-0">
-        <div className="rounded-lg bg-gray-50 border border-gray-200 px-2 py-1.5 text-center">
-          <p className="text-base font-bold text-gray-800">{total}</p>
-          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Avaliados</p>
+        <div className="rounded-lg bg-muted border border-border px-2 py-1.5 text-center">
+          <p className="text-base font-bold text-foreground">{total}</p>
+          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Avaliados</p>
         </div>
         {data.map(item => (
           <div key={item.short} className="rounded-lg px-2 py-1 flex items-center justify-between"
             style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}50` }}>
             <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.short}</span>
-            <span className="text-xs font-bold text-gray-800">{item.value}</span>
+            <span className="text-xs font-bold text-foreground">{item.value}</span>
           </div>
         ))}
       </div>
       {/* Right donut */}
       <div className="flex-1">
         <div className="flex items-center gap-1.5 mb-1">
-          <Icon className="w-4 h-4 text-green-700" />
-          <p className="text-sm font-bold text-gray-700">{title}</p>
+          <Icon className="w-4 h-4 text-primary" />
+          <p className="text-sm font-bold text-foreground">{title}</p>
         </div>
         {total > 0 ? (
           <>
@@ -94,7 +96,7 @@ const DonutSection: React.FC<{
                   dataKey="value"
                   paddingAngle={2}
                   labelLine={false}
-                  label={renderLabel}
+                  label={renderPieLabel}
                 >
                   {data.filter(d => d.value > 0).map((e: any, i: number) => (
                     <Cell key={i} fill={e.color} />
@@ -110,18 +112,18 @@ const DonutSection: React.FC<{
               {data.map(item => (
                 <div key={item.short} className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-[9px] text-gray-500">{item.short} – {item.name}</span>
+                  <span className="text-[9px] text-muted-foreground">{item.short} – {item.name}</span>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          <div className="h-36 flex items-center justify-center text-gray-400 text-xs">Sem dados</div>
+          <div className="h-36 flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
         )}
       </div>
     </div>
   );
-};
+});
 
 /* ══════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -1024,12 +1026,7 @@ const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeB
                         <PieChart>
                           <Pie data={activeBimestreData?.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-                              if (percent < 0.05) return null;
-                              const R = Math.PI / 180;
-                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
-                            }}
+                            label={renderPieLabel}
                           >
                             {activeBimestreData?.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
@@ -1065,12 +1062,7 @@ const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeB
                         <PieChart>
                           <Pie data={activeBimestreData?.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
                             innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-                              if (percent < 0.05) return null;
-                              const R = Math.PI / 180;
-                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
-                            }}
+                            label={renderPieLabel}
                           >
                             {activeBimestreData?.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />

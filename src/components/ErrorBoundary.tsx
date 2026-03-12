@@ -35,8 +35,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
               Ocorreu um erro inesperado. Recarregue a página para continuar.
             </p>
             <button
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium mr-2"
+            >
+              Tentar novamente
+            </button>
+            <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+              className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm font-medium"
             >
               Recarregar
             </button>
