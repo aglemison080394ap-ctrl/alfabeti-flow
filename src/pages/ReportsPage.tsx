@@ -448,8 +448,12 @@ const ReportsPage: React.FC = () => {
     setGenerating(null);
   };
 
-  /* ── Spreadsheet table section ─────────────────────────────────── */
-  const SpreadsheetTable = () => {
+/* ── Spreadsheet table section ─────────────────────────────────── */
+interface SpreadsheetTableProps {
+  reportData: any;
+  schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
+}
+const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolInfo }) => {
     const coordinatorName = reportData?.coordinatorName || '';
     const teacherName     = reportData?.classData?.teachers?.name || '';
     const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
