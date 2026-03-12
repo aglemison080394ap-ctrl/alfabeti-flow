@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import schoolLogo from '@/assets/school-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,24 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, FileDown } from 'lucide-react';
+import { FileImage, BarChart3, Printer, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+
+/* ── Stable pie label renderer (defined outside component to avoid re-render loops) ── */
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  if (percent < 0.05) return null;
+  const R = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * R);
+  const y = cy + r * Math.sin(-midAngle * R);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {`${Math.round(percent * 100)}%`}
+    </text>
+  );
+};
 
 /* ── Level config ─────────────────────────────────────────────────── */
 const WRITING_LEVELS: Record<string, { label: string; color: string; short: string }> = {
