@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import schoolLogo from '@/assets/school-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
