@@ -831,9 +831,10 @@ const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeB
         </div>
       </div>
     );
-  };
+};
 
-  /* ── JSX ─────────────────────────────────────────────────────── */
+/* ── Main component ─────────────────────────────────────────────── */
+const ReportsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
