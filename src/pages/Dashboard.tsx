@@ -181,7 +181,8 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
 
   // ── Donut Card ─────────────────────────────────────────────────────────────
   const DonutCard = ({
