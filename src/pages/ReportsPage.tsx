@@ -61,40 +61,28 @@ function absenceTotal(assessMap: Record<string, any>, students: any[], b: string
 /* ── Fat Donut for reports ────────────────────────────────────────── */
 const DonutSection: React.FC<{
   title: string; icon: React.ElementType; data: any[]; total: number;
-}> = ({ title, icon: Icon, data, total }) => {
-  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-    if (percent < 0.05) return null;
-    const R = Math.PI / 180;
-    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + r * Math.cos(-midAngle * R);
-    const y = cy + r * Math.sin(-midAngle * R);
-    return (
-      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
-        {`${Math.round(percent * 100)}%`}
-      </text>
-    );
-  };
+}> = React.memo(({ title, icon: Icon, data, total }) => {
   return (
     <div className="flex gap-3">
       {/* Left stat cards */}
       <div className="flex flex-col gap-1.5 w-28 shrink-0">
-        <div className="rounded-lg bg-gray-50 border border-gray-200 px-2 py-1.5 text-center">
-          <p className="text-base font-bold text-gray-800">{total}</p>
-          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Avaliados</p>
+        <div className="rounded-lg bg-muted border border-border px-2 py-1.5 text-center">
+          <p className="text-base font-bold text-foreground">{total}</p>
+          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Avaliados</p>
         </div>
         {data.map(item => (
           <div key={item.short} className="rounded-lg px-2 py-1 flex items-center justify-between"
             style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}50` }}>
             <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.short}</span>
-            <span className="text-xs font-bold text-gray-800">{item.value}</span>
+            <span className="text-xs font-bold text-foreground">{item.value}</span>
           </div>
         ))}
       </div>
       {/* Right donut */}
       <div className="flex-1">
         <div className="flex items-center gap-1.5 mb-1">
-          <Icon className="w-4 h-4 text-green-700" />
-          <p className="text-sm font-bold text-gray-700">{title}</p>
+          <Icon className="w-4 h-4 text-primary" />
+          <p className="text-sm font-bold text-foreground">{title}</p>
         </div>
         {total > 0 ? (
           <>
@@ -108,7 +96,7 @@ const DonutSection: React.FC<{
                   dataKey="value"
                   paddingAngle={2}
                   labelLine={false}
-                  label={renderLabel}
+                  label={renderPieLabel}
                 >
                   {data.filter(d => d.value > 0).map((e: any, i: number) => (
                     <Cell key={i} fill={e.color} />
