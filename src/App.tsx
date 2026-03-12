@@ -28,7 +28,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
             
             <Route path="/" element={
