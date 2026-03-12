@@ -184,6 +184,10 @@ const Dashboard: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
   // ── Donut Card ─────────────────────────────────────────────────────────────
   const DonutCard = ({
     title, icon: Icon, data, assessed,
