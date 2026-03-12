@@ -973,7 +973,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolI
             className="print-section bg-white rounded-2xl overflow-hidden border border-border shadow-card"
             ref={tableRef}
           >
-            <SpreadsheetTable />
+            <SpreadsheetTable reportData={reportData} schoolInfo={schoolInfo} />
           </div>
 
           {/* ════════════════════════════════════════════════
