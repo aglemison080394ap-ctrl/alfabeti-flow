@@ -8,24 +8,10 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { FileImage, BarChart3, Printer, FileDown } from 'lucide-react';
+import { FileImage, BarChart3, Printer, PenLine, BookOpen, TrendingUp, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-
-/* ── Stable pie label renderer (defined outside component to avoid re-render loops) ── */
-const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  if (percent < 0.05) return null;
-  const R = Math.PI / 180;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * R);
-  const y = cy + r * Math.sin(-midAngle * R);
-  return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
-      {`${Math.round(percent * 100)}%`}
-    </text>
-  );
-};
 
 /* ── Level config ─────────────────────────────────────────────────── */
 const WRITING_LEVELS: Record<string, { label: string; color: string; short: string }> = {
@@ -50,31 +36,51 @@ const LEVEL_CSS: Record<string, string> = {
   LF: 'bg-blue-50 text-blue-700 border-blue-300',
   LT: 'bg-green-50 text-green-700 border-green-300',
 };
-void LEVEL_CSS; // silence unused warning
+
+/* ── Helper ───────────────────────────────────────────────────────── */
+function absenceTotal(assessMap: Record<string, any>, students: any[], b: string) {
+  let sum = 0;
+  students.forEach(s => { const a = assessMap[s.id]?.[b]; if (a?.absences) sum += a.absences; });
+  return sum || 0;
+}
 
 /* ── Fat Donut for reports ────────────────────────────────────────── */
-const DonutSection = React.memo(({ title, icon: Icon, data, total }: {
+const DonutSection: React.FC<{
   title: string; icon: React.ElementType; data: any[]; total: number;
-}) => {
+}> = ({ title, icon: Icon, data, total }) => {
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+    if (percent < 0.05) return null;
+    const R = Math.PI / 180;
+    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + r * Math.cos(-midAngle * R);
+    const y = cy + r * Math.sin(-midAngle * R);
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
+        {`${Math.round(percent * 100)}%`}
+      </text>
+    );
+  };
   return (
     <div className="flex gap-3">
+      {/* Left stat cards */}
       <div className="flex flex-col gap-1.5 w-28 shrink-0">
-        <div className="rounded-lg bg-muted border border-border px-2 py-1.5 text-center">
-          <p className="text-base font-bold text-foreground">{total}</p>
-          <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Avaliados</p>
+        <div className="rounded-lg bg-gray-50 border border-gray-200 px-2 py-1.5 text-center">
+          <p className="text-base font-bold text-gray-800">{total}</p>
+          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Avaliados</p>
         </div>
         {data.map(item => (
           <div key={item.short} className="rounded-lg px-2 py-1 flex items-center justify-between"
             style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}50` }}>
             <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.short}</span>
-            <span className="text-xs font-bold text-foreground">{item.value}</span>
+            <span className="text-xs font-bold text-gray-800">{item.value}</span>
           </div>
         ))}
       </div>
+      {/* Right donut */}
       <div className="flex-1">
         <div className="flex items-center gap-1.5 mb-1">
-          <Icon className="w-4 h-4 text-primary" />
-          <p className="text-sm font-bold text-foreground">{title}</p>
+          <Icon className="w-4 h-4 text-green-700" />
+          <p className="text-sm font-bold text-gray-700">{title}</p>
         </div>
         {total > 0 ? (
           <>
@@ -88,7 +94,7 @@ const DonutSection = React.memo(({ title, icon: Icon, data, total }: {
                   dataKey="value"
                   paddingAngle={2}
                   labelLine={false}
-                  label={renderPieLabel}
+                  label={renderLabel}
                 >
                   {data.filter(d => d.value > 0).map((e: any, i: number) => (
                     <Cell key={i} fill={e.color} />
@@ -104,272 +110,14 @@ const DonutSection = React.memo(({ title, icon: Icon, data, total }: {
               {data.map(item => (
                 <div key={item.short} className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-[9px] text-muted-foreground">{item.short} – {item.name}</span>
+                  <span className="text-[9px] text-gray-500">{item.short} – {item.name}</span>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          <div className="h-36 flex items-center justify-center text-muted-foreground text-xs">Sem dados</div>
+          <div className="h-36 flex items-center justify-center text-gray-400 text-xs">Sem dados</div>
         )}
-      </div>
-    </div>
-  );
-});
-
-/* ── Spreadsheet table section ─────────────────────────────────────
-   MUST be defined OUTSIDE the ReportsPage component to avoid
-   component re-creation on every render (crash/loop source).
-──────────────────────────────────────────────────────────────────── */
-interface SpreadsheetTableProps {
-  reportData: any;
-  schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
-}
-const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ reportData, schoolInfo }) => {
-  const coordinatorName = reportData?.coordinatorName || '';
-  const teacherName     = reportData?.classData?.teachers?.name || '';
-  const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
-  const schoolYear      = schoolInfo.active_school_year || new Date().getFullYear();
-  const today           = new Date().toLocaleDateString('pt-BR');
-
-  const rows = [...(reportData?.students || [])];
-  while (rows.length < 35) rows.push(null);
-
-  const writingColors: Record<string, { bg: string; color: string }> = {
-    PS: { bg: '#fee2e2', color: '#b91c1c' },
-    S:  { bg: '#fef3c7', color: '#92400e' },
-    SA: { bg: '#dbeafe', color: '#1d4ed8' },
-    A:  { bg: '#dcfce7', color: '#15803d' },
-  };
-  const readingColors: Record<string, { bg: string; color: string }> = {
-    NL: { bg: '#fee2e2', color: '#b91c1c' },
-    LP: { bg: '#fef3c7', color: '#92400e' },
-    LF: { bg: '#dbeafe', color: '#1d4ed8' },
-    LT: { bg: '#dcfce7', color: '#15803d' },
-  };
-
-  const bimColors = ['#1e3a5f', '#1e4d6b', '#1a5276', '#154360'];
-  const bimLight  = ['#e8f0f9', '#e3eff7', '#ddeef8', '#d8ecf5'];
-
-  return (
-    <div style={{
-      background: '#fff',
-      fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-      padding: '0',
-      width: '100%',
-    }}>
-      {/* ── Header band ── */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
-        padding: '20px 28px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 20,
-      }}>
-        <img
-          src={schoolLogo}
-          alt="Logo E.M.E.F Roseli Paiva"
-          style={{ width: 96, height: 96, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))' }}
-        />
-        <div style={{ flex: 1 }}>
-          <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 9, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
-            Secretaria Municipal de Educação
-          </div>
-          <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
-            {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9.5, marginTop: 2 }}>
-            {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYear}
-          </div>
-        </div>
-        <div style={{
-          background: 'rgba(255,255,255,0.12)',
-          border: '1px solid rgba(255,255,255,0.25)',
-          borderRadius: 8, padding: '8px 14px', textAlign: 'center', flexShrink: 0,
-        }}>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Documento Oficial</div>
-          <div style={{ color: '#fff', fontSize: 10, fontWeight: 800, marginTop: 2 }}>Sondagem de Leitura</div>
-          <div style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>e Escrita</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 3 }}>{today}</div>
-        </div>
-      </div>
-
-      {/* ── Meta row ── */}
-      <div style={{ display: 'flex', borderBottom: '3px solid #0f2d55', background: '#f0f5fc' }}>
-        {[
-          { label: 'PROFESSOR(A)', value: teacherName },
-          { label: 'COORDENADOR(A)', value: coordinatorName },
-          { label: 'TURMA', value: turma },
-          { label: 'ANO LETIVO', value: String(schoolYear) },
-        ].map((item, i) => (
-          <div key={i} style={{
-            flex: i === 0 || i === 1 ? 2 : 1,
-            padding: '8px 14px',
-            borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
-          }}>
-            <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
-            <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>{item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Main table ── */}
-      <div style={{ padding: '0 0 20px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-          <thead>
-            <tr>
-              <th rowSpan={3} style={{ background: '#0f2d55', color: '#fff', border: '1px solid #1a4a7a', padding: '6px 4px', textAlign: 'center', width: 28, verticalAlign: 'middle', fontSize: 9, fontWeight: 700, letterSpacing: 0.5 }}>Nº</th>
-              <th rowSpan={3} style={{ background: '#0f2d55', color: '#fff', border: '1px solid #1a4a7a', padding: '6px 10px', textAlign: 'left', minWidth: 160, verticalAlign: 'middle', fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>NOME DO ALUNO(A)</th>
-              <th rowSpan={3} style={{ background: '#0f2d55', color: '#fff', border: '1px solid #1a4a7a', padding: '6px 4px', textAlign: 'center', width: 40, verticalAlign: 'middle', fontSize: 9, fontWeight: 700 }}>IDADE</th>
-              {['1º BIMESTRE','2º BIMESTRE','3º BIMESTRE','4º BIMESTRE'].map((b, i) => (
-                <th key={b} colSpan={3} style={{ background: bimColors[i], color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 4px', textAlign: 'center', fontSize: 10, fontWeight: 800, letterSpacing: 0.5 }}>{b}</th>
-              ))}
-            </tr>
-            <tr>
-              {[0,1,2,3].map(i => (
-                <React.Fragment key={i}>
-                  <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>ESCRITA</th>
-                  <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>LEITURA</th>
-                  <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>FALTAS</th>
-                </React.Fragment>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((student: any, idx: number) => {
-              const isEven = idx % 2 === 0;
-              const rowBg  = isEven ? '#ffffff' : '#f4f8fd';
-              return (
-                <tr key={idx} style={{ background: rowBg }}>
-                  <td style={{ border: '1px solid #dde6f0', padding: '4px 3px', textAlign: 'center', fontSize: 9.5, fontWeight: 700, color: '#4a6fa5' }}>{String(idx + 1).padStart(2, '0')}</td>
-                  <td style={{ border: '1px solid #dde6f0', padding: '4px 10px', fontSize: 10, color: '#0f2d55', fontWeight: student ? 500 : 400, borderLeft: '3px solid #0f2d55' }}>{student?.name || ''}</td>
-                  <td style={{ border: '1px solid #dde6f0', padding: '4px 3px', textAlign: 'center', fontSize: 10, color: '#374151' }}>{student?.age || ''}</td>
-                  {(['1','2','3','4'] as const).map((b, bi) => {
-                    const a  = student ? reportData?.assessMap[student.id]?.[b] : null;
-                    const wl = a?.writing_level || '';
-                    const rl = a?.reading_level || '';
-                    const wStyle = wl ? writingColors[wl] : null;
-                    const rStyle = rl ? readingColors[rl] : null;
-                    return (
-                      <React.Fragment key={b}>
-                        <td style={{ border: '1px solid #dde6f0', borderLeft: `2px solid ${bimColors[bi]}40`, padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700, background: wStyle ? wStyle.bg : rowBg, color: wStyle ? wStyle.color : '#9ca3af' }}>{wl}</td>
-                        <td style={{ border: '1px solid #dde6f0', padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700, background: rStyle ? rStyle.bg : rowBg, color: rStyle ? rStyle.color : '#9ca3af' }}>{rl}</td>
-                        <td style={{ border: '1px solid #dde6f0', borderRight: `2px solid ${bimColors[bi]}40`, padding: '3px 2px', textAlign: 'center', fontSize: 10, color: '#374151', background: a?.absences > 0 ? '#fff7ed' : rowBg, fontWeight: a?.absences > 0 ? 700 : 400 }}>{a != null ? (a.absences ?? 0) : ''}</td>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── Legend + Signatures ── */}
-      <div style={{ padding: '0 0 24px' }}>
-        <div style={{ margin: '0 0 20px', background: '#f0f5fc', border: '1px solid #c8d8ec', borderRadius: 6, padding: '10px 14px', display: 'flex', gap: 32, flexWrap: 'wrap' as const }}>
-          <div>
-            <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Escrita</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[['PS','Pré-silábico','#fee2e2','#b91c1c'],['S','Silábico','#fef3c7','#92400e'],['SA','Sil.-Alfabético','#dbeafe','#1d4ed8'],['A','Alfabético','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
-                <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
-                  <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Leitura</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[['NL','Não Leu','#fee2e2','#b91c1c'],['LP','Leu Palavras','#fef3c7','#92400e'],['LF','Leu Frases','#dbeafe','#1d4ed8'],['LT','Leu Texto','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
-                <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
-                  <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 32, padding: '0 4px' }}>
-          {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(role => (
-            <div key={role} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ borderBottom: '1.5px solid #0f2d55', marginBottom: 6, height: 32 }} />
-              <div style={{ fontSize: 9, color: '#0f2d55', fontWeight: 700, letterSpacing: 0.3 }}>{role}</div>
-              <div style={{ fontSize: 8, color: '#9ca3af', marginTop: 1 }}>Assinatura / Carimbo</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ── Professional Dashboard Export Header ──────────────────────────
-   MUST be defined OUTSIDE the ReportsPage component to avoid
-   component re-creation on every render (crash/loop source).
-──────────────────────────────────────────────────────────────────── */
-interface DashHeaderProps {
-  reportData: any;
-  schoolInfo: { name: string; city: string; coordinator: string; active_school_year: number };
-  activeBimestreData: { activeB: any } | null;
-}
-const DashHeader: React.FC<DashHeaderProps> = ({ reportData, schoolInfo, activeBimestreData }) => {
-  const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
-  const teacher  = reportData?.classData?.teachers?.name || '';
-  const today    = new Date().toLocaleDateString('pt-BR');
-  const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
-  const activeAssessed = activeBimestreData?.activeB?.assessed ?? 0;
-  const totalStudents  = reportData?.students?.length ?? 0;
-  const activeBim      = activeBimestreData?.activeB?.bimestre ?? '?';
-
-  const statsCards = [
-    { label: 'Total de Alunos',        value: totalStudents,                  color: '#0f2d55', bg: '#e8f0fb' },
-    { label: 'Avaliados',              value: activeAssessed,                 color: '#15803d', bg: '#dcfce7' },
-    { label: 'Não Avaliados',          value: totalStudents - activeAssessed, color: '#b45309', bg: '#fef3c7' },
-    { label: `${activeBim}º Bimestre`, value: 'Selecionado',                  color: '#1d4ed8', bg: '#dbeafe' },
-  ];
-
-  return (
-    <div style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)', padding: '20px 28px 18px', display: 'flex', alignItems: 'center', gap: 20 }}>
-        <img src={schoolLogo} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))' }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 8.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>Secretaria Municipal de Educação</div>
-          <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>{schoolInfo.name || 'E.M.E.F Roseli Paiva'}</div>
-          <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9.5, marginTop: 3 }}>{schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYr}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '10px 16px', textAlign: 'center', flexShrink: 0 }}>
-          <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 }}>Documento Oficial</div>
-          <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Dashboard de Resultados</div>
-          <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Sondagem</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 4 }}>{today}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', borderBottom: '3px solid #0f2d55', background: '#f0f5fc' }}>
-        {[
-          { label: 'PROFESSOR(A)', value: teacher },
-          { label: 'TURMA', value: turma },
-          { label: 'COORDENADOR(A)', value: reportData?.coordinatorName || '' },
-          { label: 'DATA DE EMISSÃO', value: today },
-        ].map((item, i) => (
-          <div key={i} style={{ flex: i === 0 || i === 2 ? 2 : 1, padding: '8px 14px', borderRight: i < 3 ? '1px solid #c8d8ec' : 'none' }}>
-            <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
-            <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>
-              {item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
-        {statsCards.map((s, i) => (
-          <div key={i} style={{ flex: 1, background: s.bg, border: `1px solid ${s.color}30`, borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
-            <div style={{ color: s.color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{s.value}</div>
-            <div style={{ color: s.color, fontSize: 8.5, fontWeight: 600, marginTop: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>{s.label}</div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -397,16 +145,28 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading]                   = useState(false);
   const [generating, setGenerating]             = useState<string | null>(null);
 
+  // Load only teacher's own classes (or all for admin)
   useEffect(() => {
     if (!profile) return;
     const loadClasses = async () => {
       if (isAdmin) {
-        const { data } = await supabase.from('classes').select('*, teachers(name)').order('grade_year');
+        const { data } = await supabase
+          .from('classes')
+          .select('*, teachers(name)')
+          .order('grade_year');
         if (data) setClasses(data);
       } else {
-        const { data: teacherData } = await supabase.from('teachers').select('id').eq('user_id', profile.user_id).maybeSingle();
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
         if (teacherData) {
-          const { data } = await supabase.from('classes').select('*, teachers(name)').eq('teacher_id', teacherData.id).order('grade_year');
+          const { data } = await supabase
+            .from('classes')
+            .select('*, teachers(name)')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
           if (data) {
             setClasses(data);
             if (data.length > 0) setSelectedClass(data[0].id);
@@ -434,54 +194,64 @@ const ReportsPage: React.FC = () => {
     }
     setLoading(true);
 
-    try {
-      const classData = classes.find(c => c.id === selectedClass);
+    const classData = classes.find(c => c.id === selectedClass);
 
-      let coordinatorName = '___________________';
-      if (classData?.teacher_id) {
-        const { data: teacherRow } = await supabase.from('teachers').select('coordinator_name').eq('id', classData.teacher_id).maybeSingle();
-        if (teacherRow?.coordinator_name) coordinatorName = teacherRow.coordinator_name;
+    let coordinatorName = '___________________';
+    if (classData?.teacher_id) {
+      const { data: teacherRow } = await supabase
+        .from('teachers')
+        .select('coordinator_name')
+        .eq('id', classData.teacher_id)
+        .maybeSingle();
+      if (teacherRow?.coordinator_name) {
+        coordinatorName = teacherRow.coordinator_name;
       }
-
-      const { data: students } = await supabase.from('students').select('*').eq('class_id', selectedClass).order('name');
-      const studentIds = students?.map(s => s.id) || [];
-      const { data: rawAssessments } = studentIds.length > 0
-        ? await supabase.from('assessments').select('*').in('student_id', studentIds)
-        : { data: [] };
-      const finalAssessments = rawAssessments || [];
-
-      const assessMap: Record<string, Record<string, any>> = {};
-      finalAssessments.forEach(a => {
-        if (!assessMap[a.student_id]) assessMap[a.student_id] = {};
-        assessMap[a.student_id][a.bimestre] = a;
-      });
-
-      const totalStudents = (students || []).length;
-
-      const bimestreStats = (['1','2','3','4'] as const).map(b => {
-        const bData = finalAssessments.filter(a => a.bimestre === b);
-        const assessed = bData.filter(a => a.writing_level || a.reading_level).length;
-        const wC = { PS: 0, S: 0, SA: 0, A: 0 };
-        const rC = { NL: 0, LP: 0, LF: 0, LT: 0 };
-        bData.forEach(a => {
-          if (a.writing_level) wC[a.writing_level as keyof typeof wC]++;
-          if (a.reading_level) rC[a.reading_level as keyof typeof rC]++;
-        });
-        return { bimestre: b, total: totalStudents, assessed, wC, rC };
-      });
-
-      const evolutionData = bimestreStats.map(b => ({
-        name: `${b.bimestre}º Bim`,
-        'Alfabético': b.assessed > 0 ? Math.round((b.wC.A  / b.assessed) * 100) : 0,
-        'Leu Texto':  b.assessed > 0 ? Math.round((b.rC.LT / b.assessed) * 100) : 0,
-      }));
-
-      setReportData({ classData, students: students || [], assessMap, bimestreStats, evolutionData, coordinatorName });
-      setSelectedBimestre('auto');
-    } catch (err) {
-      console.error('generateReport error:', err);
-      toast({ title: 'Erro ao gerar relatório', description: 'Tente novamente.', variant: 'destructive' });
     }
+
+    const { data: students } = await supabase
+      .from('students').select('*').eq('class_id', selectedClass).order('name');
+
+    const studentIds = students?.map(s => s.id) || [];
+    const { data: rawAssessments } = studentIds.length > 0
+      ? await supabase.from('assessments').select('*').in('student_id', studentIds)
+      : { data: [] };
+    const finalAssessments = rawAssessments || [];
+
+    const assessMap: Record<string, Record<string, any>> = {};
+    finalAssessments.forEach(a => {
+      if (!assessMap[a.student_id]) assessMap[a.student_id] = {};
+      assessMap[a.student_id][a.bimestre] = a;
+    });
+
+    const totalStudents = (students || []).length;
+
+    const bimestreStats = (['1','2','3','4'] as const).map(b => {
+      const bData = finalAssessments.filter(a => a.bimestre === b);
+      // assessed = alunos COM nível de escrita OU leitura preenchido (faltosos não contam)
+      const assessed = bData.filter(a => a.writing_level || a.reading_level).length;
+      const wC = { PS: 0, S: 0, SA: 0, A: 0 };
+      const rC = { NL: 0, LP: 0, LF: 0, LT: 0 };
+      bData.forEach(a => {
+        if (a.writing_level) wC[a.writing_level as keyof typeof wC]++;
+        if (a.reading_level) rC[a.reading_level as keyof typeof rC]++;
+      });
+      // total = todos os alunos da turma
+      return { bimestre: b, total: totalStudents, assessed, wC, rC };
+    });
+
+    const evolutionData = bimestreStats.map(b => ({
+      name: `${b.bimestre}º Bim`,
+      'Alfabético': b.assessed > 0 ? Math.round((b.wC.A  / b.assessed) * 100) : 0,
+      'Leu Texto':  b.assessed > 0 ? Math.round((b.rC.LT / b.assessed) * 100) : 0,
+    }));
+
+    setReportData({
+      classData, students: students || [], assessMap,
+      bimestreStats,
+      evolutionData,
+      coordinatorName,
+    });
+    setSelectedBimestre('auto');
     setLoading(false);
   };
 
@@ -489,12 +259,13 @@ const ReportsPage: React.FC = () => {
   const activeBimestreData = React.useMemo(() => {
     if (!reportData) return null;
     const { bimestreStats } = reportData;
-    let activeB: any;
+    let activeB;
     if (selectedBimestre === 'auto') {
       activeB = [...bimestreStats].reverse().find((b: any) => b.assessed > 0) || bimestreStats[0];
     } else {
       activeB = bimestreStats.find((b: any) => b.bimestre === selectedBimestre) || bimestreStats[0];
     }
+    // pct calculado sobre os avaliados (assessed), não o total da turma
     const writingChartData = Object.entries(activeB.wC).map(([key, value]: [string, any]) => ({
       name: WRITING_LEVELS[key].label, short: WRITING_LEVELS[key].short,
       value, color: WRITING_LEVELS[key].color,
@@ -528,16 +299,25 @@ const ReportsPage: React.FC = () => {
   };
 
   /* ── High-quality capture helper ─────────────────────────────── */
-  const captureElement = async (el: HTMLDivElement, exportWidth = 1440): Promise<HTMLCanvasElement> => {
+  // exportWidth: px width used to render (portrait ≈ 900, landscape ≈ 1440)
+  const captureElement = async (
+    el: HTMLDivElement,
+    exportWidth = 1440,
+  ): Promise<HTMLCanvasElement> => {
     const html2canvas = (await import('html2canvas')).default;
 
     const svgSizeMap = new Map<SVGElement, { w: number; h: number }>();
     el.querySelectorAll<SVGElement>('svg').forEach(svg => {
       const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      if (r.width > 0 && r.height > 0)
+        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
     });
 
-    const prev = { width: el.style.width, maxWidth: el.style.maxWidth, overflow: el.style.overflow, position: el.style.position, transform: el.style.transform };
+    const prev = {
+      width: el.style.width, maxWidth: el.style.maxWidth,
+      overflow: el.style.overflow, position: el.style.position,
+      transform: el.style.transform,
+    };
 
     el.style.width     = `${exportWidth}px`;
     el.style.maxWidth  = 'none';
@@ -549,7 +329,8 @@ const ReportsPage: React.FC = () => {
 
     el.querySelectorAll<SVGElement>('svg').forEach(svg => {
       const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      if (r.width > 0 && r.height > 0)
+        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
     });
 
     const W = el.scrollWidth;
@@ -561,9 +342,12 @@ const ReportsPage: React.FC = () => {
       useCORS: true,
       logging: false,
       allowTaint: false,
-      width: W, height: H,
-      windowWidth: W + 80, windowHeight: H + 80,
-      x: 0, y: 0,
+      width: W,
+      height: H,
+      windowWidth:  W + 80,
+      windowHeight: H + 80,
+      x: 0,
+      y: 0,
       onclone: (_doc: Document, clonedEl: HTMLElement) => {
         const clonedSvgs = clonedEl.querySelectorAll<SVGElement>('svg');
         const origSvgs   = el.querySelectorAll<SVGElement>('svg');
@@ -578,7 +362,9 @@ const ReportsPage: React.FC = () => {
             clonedSvg.style.height = `${dims.h}px`;
           }
         });
-        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => { node.style.transform = 'none'; });
+        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => {
+          node.style.transform = 'none';
+        });
         (clonedEl as any).style['font-smooth'] = 'always';
         (clonedEl as any).style['-webkit-font-smoothing'] = 'antialiased';
       },
@@ -593,6 +379,7 @@ const ReportsPage: React.FC = () => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
+      // Portrait spreadsheet captured at A4-proportional width (~900px)
       const canvas = await captureElement(ref.current, isSpreadsheet ? 900 : 1440);
       const link   = document.createElement('a');
       link.download = filename.replace(/\.(jpg|jpeg|pdf)$/i, '.png');
@@ -600,17 +387,25 @@ const ReportsPage: React.FC = () => {
       link.click();
       toast({ title: '✅ PNG exportado em alta qualidade!' });
     } catch (e) {
-      console.error('PNG export error:', e);
+      console.error(e);
       toast({ title: 'Erro ao exportar PNG', variant: 'destructive' });
     }
     setGenerating(null);
   };
 
   /* ── PDF Export ───────────────────────────────────────────────── */
-  const handleDownloadPDF = async (ref: React.RefObject<HTMLDivElement>, filename: string, isSpreadsheet = false) => {
+  // isSpreadsheet=true → A4 retrato (preenche a página toda)
+  // isSpreadsheet=false → A4 paisagem
+  const handleDownloadPDF = async (
+    ref: React.RefObject<HTMLDivElement>,
+    filename: string,
+    isSpreadsheet = false,
+  ) => {
     if (!ref.current) return;
     setGenerating(filename);
     try {
+      // For portrait spreadsheet, capture at ~900px width (A4 portrait proportions)
+      // so the image ratio naturally fits a portrait page
       const exportWidth = isSpreadsheet ? 900 : 1440;
       const canvas    = await captureElement(ref.current, exportWidth);
       const { jsPDF } = await import('jspdf');
@@ -619,9 +414,17 @@ const ReportsPage: React.FC = () => {
       const pdfW = landscape ? 297 : 210;
       const pdfH = landscape ? 210 : 297;
 
-      const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4', compress: false });
+      const pdf = new jsPDF({
+        orientation: landscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: false,
+      });
 
+      // For spreadsheet: stretch to fill the FULL page (no margins, no gaps)
+      // For charts: 5mm margin, contain within page
       if (isSpreadsheet) {
+        // A4 portrait com margem de 5mm em todos os lados
         const m = 5;
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', m, m, pdfW - m * 2, pdfH - m * 2);
       } else {
@@ -639,10 +442,386 @@ const ReportsPage: React.FC = () => {
       pdf.save(filename.replace(/\.(jpg|jpeg|png)$/i, '.pdf'));
       toast({ title: '✅ PDF exportado em alta qualidade!' });
     } catch (e) {
-      console.error('PDF export error:', e);
+      console.error(e);
       toast({ title: 'Erro ao exportar PDF', variant: 'destructive' });
     }
     setGenerating(null);
+  };
+
+  /* ── Spreadsheet table section ─────────────────────────────────── */
+  const SpreadsheetTable = () => {
+    const coordinatorName = reportData?.coordinatorName || '';
+    const teacherName     = reportData?.classData?.teachers?.name || '';
+    const turma           = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
+    const schoolYear      = schoolInfo.active_school_year || new Date().getFullYear();
+    const today           = new Date().toLocaleDateString('pt-BR');
+
+    // Always show at least 35 rows
+    const rows = [...(reportData?.students || [])];
+    while (rows.length < 35) rows.push(null);
+
+    // Color maps for level cells
+    const writingColors: Record<string, { bg: string; color: string }> = {
+      PS: { bg: '#fee2e2', color: '#b91c1c' },
+      S:  { bg: '#fef3c7', color: '#92400e' },
+      SA: { bg: '#dbeafe', color: '#1d4ed8' },
+      A:  { bg: '#dcfce7', color: '#15803d' },
+    };
+    const readingColors: Record<string, { bg: string; color: string }> = {
+      NL: { bg: '#fee2e2', color: '#b91c1c' },
+      LP: { bg: '#fef3c7', color: '#92400e' },
+      LF: { bg: '#dbeafe', color: '#1d4ed8' },
+      LT: { bg: '#dcfce7', color: '#15803d' },
+    };
+
+    // Header colors per bimestre
+    const bimColors = ['#1e3a5f', '#1e4d6b', '#1a5276', '#154360'];
+    const bimLight  = ['#e8f0f9', '#e3eff7', '#ddeef8', '#d8ecf5'];
+
+    return (
+      <div style={{
+        background: '#fff',
+        fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        padding: '0',
+        width: '100%',
+      }}>
+
+        {/* ── Header band ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
+          padding: '20px 28px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+        }}>
+          {/* School Logo — PNG sem fundo */}
+          <img
+            src={schoolLogo}
+            alt="Logo E.M.E.F Roseli Paiva"
+            style={{
+              width: 96, height: 96,
+              objectFit: 'contain',
+              flexShrink: 0,
+              filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
+            }}
+          />
+
+          {/* School info */}
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 9, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
+              Secretaria Municipal de Educação
+            </div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
+              {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9.5, marginTop: 2 }}>
+              {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYear}
+            </div>
+          </div>
+
+          {/* Document title badge */}
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Documento Oficial</div>
+            <div style={{ color: '#fff', fontSize: 10, fontWeight: 800, marginTop: 2 }}>Sondagem de Leitura</div>
+            <div style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>e Escrita</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 3 }}>{today}</div>
+          </div>
+        </div>
+
+        {/* ── Meta row ── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '3px solid #0f2d55',
+          background: '#f0f5fc',
+        }}>
+          {[
+            { label: 'PROFESSOR(A)', value: teacherName },
+            { label: 'COORDENADOR(A)', value: coordinatorName },
+            { label: 'TURMA', value: turma },
+            { label: 'ANO LETIVO', value: String(schoolYear) },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: i === 0 || i === 1 ? 2 : 1,
+              padding: '8px 14px',
+              borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
+            }}>
+              <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>{item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Main table ── */}
+        <div style={{ padding: '0 0 20px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+            <thead>
+              {/* Row 1: column groups */}
+              <tr>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 4px', textAlign: 'center',
+                  width: 28, verticalAlign: 'middle',
+                  fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                }}>Nº</th>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 10px', textAlign: 'left',
+                  minWidth: 160, verticalAlign: 'middle',
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                }}>NOME DO ALUNO(A)</th>
+                <th rowSpan={3} style={{
+                  background: '#0f2d55', color: '#fff',
+                  border: '1px solid #1a4a7a',
+                  padding: '6px 4px', textAlign: 'center',
+                  width: 40, verticalAlign: 'middle',
+                  fontSize: 9, fontWeight: 700,
+                }}>IDADE</th>
+                {['1º BIMESTRE','2º BIMESTRE','3º BIMESTRE','4º BIMESTRE'].map((b, i) => (
+                  <th key={b} colSpan={3} style={{
+                    background: bimColors[i], color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    padding: '6px 4px', textAlign: 'center',
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+                  }}>{b}</th>
+                ))}
+              </tr>
+              {/* Row 2: sub-columns per bimestre */}
+              <tr>
+                {[0,1,2,3].map(i => (
+                  <React.Fragment key={i}>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>ESCRITA</th>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>LEITURA</th>
+                    <th style={{ background: bimLight[i], color: bimColors[i], border: '1px solid #c8d8ec', padding: '4px 3px', textAlign: 'center', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.3 }}>FALTAS</th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((student: any, idx: number) => {
+                const isEven = idx % 2 === 0;
+                const rowBg  = isEven ? '#ffffff' : '#f4f8fd';
+                return (
+                  <tr key={idx} style={{ background: rowBg }}>
+                    {/* Nº */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 3px',
+                      textAlign: 'center', fontSize: 9.5, fontWeight: 700, color: '#4a6fa5',
+                    }}>{String(idx + 1).padStart(2, '0')}</td>
+                    {/* Name */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 10px',
+                      fontSize: 10, color: '#0f2d55', fontWeight: student ? 500 : 400,
+                      borderLeft: '3px solid #0f2d55',
+                    }}>{student?.name || ''}</td>
+                    {/* Age */}
+                    <td style={{
+                      border: '1px solid #dde6f0', padding: '4px 3px',
+                      textAlign: 'center', fontSize: 10, color: '#374151',
+                    }}>{student?.age || ''}</td>
+                    {/* Bimestres */}
+                    {(['1','2','3','4'] as const).map((b, bi) => {
+                      const a  = student ? reportData?.assessMap[student.id]?.[b] : null;
+                      const wl = a?.writing_level || '';
+                      const rl = a?.reading_level || '';
+                      const wStyle = wl ? writingColors[wl] : null;
+                      const rStyle = rl ? readingColors[rl] : null;
+                      return (
+                        <React.Fragment key={b}>
+                          <td style={{
+                            border: '1px solid #dde6f0',
+                            borderLeft: `2px solid ${bimColors[bi]}40`,
+                            padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700,
+                            background: wStyle ? wStyle.bg : rowBg,
+                            color: wStyle ? wStyle.color : '#9ca3af',
+                          }}>{wl}</td>
+                          <td style={{
+                            border: '1px solid #dde6f0', padding: '3px 2px', textAlign: 'center', fontSize: 9.5, fontWeight: 700,
+                            background: rStyle ? rStyle.bg : rowBg,
+                            color: rStyle ? rStyle.color : '#9ca3af',
+                          }}>{rl}</td>
+                          <td style={{
+                            border: '1px solid #dde6f0',
+                            borderRight: `2px solid ${bimColors[bi]}40`,
+                            padding: '3px 2px', textAlign: 'center', fontSize: 10, color: '#374151',
+                            background: a?.absences > 0 ? '#fff7ed' : rowBg,
+                            fontWeight: a?.absences > 0 ? 700 : 400,
+                          }}>{a != null ? (a.absences ?? 0) : ''}</td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Legend + Signatures ── */}
+        <div style={{ padding: '0 0 24px', margin: '0 0 0 0' }}>
+          {/* Legend box */}
+          <div style={{
+            margin: '0 0 20px',
+            background: '#f0f5fc',
+            border: '1px solid #c8d8ec',
+            borderRadius: 6,
+            padding: '10px 14px',
+            display: 'flex',
+            gap: 32,
+            flexWrap: 'wrap' as const,
+          }}>
+            <div>
+              <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Escrita</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['PS','Pré-silábico','#fee2e2','#b91c1c'],['S','Silábico','#fef3c7','#92400e'],['SA','Sil.-Alfabético','#dbeafe','#1d4ed8'],['A','Alfabético','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                  <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
+                    <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#4a6fa5', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>Níveis de Leitura</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['NL','Não Leu','#fee2e2','#b91c1c'],['LP','Leu Palavras','#fef3c7','#92400e'],['LF','Leu Frases','#dbeafe','#1d4ed8'],['LT','Leu Texto','#dcfce7','#15803d']].map(([code,name,bg,color]) => (
+                  <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ background: bg, color, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', borderRadius: 3 }}>{code}</span>
+                    <span style={{ fontSize: 8.5, color: '#374151' }}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Signatures */}
+          <div style={{ display: 'flex', gap: 32, padding: '0 4px' }}>
+            {['Professor(a)', 'Coordenador(a) Pedagógico(a)', 'Diretor(a)'].map(role => (
+              <div key={role} style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ borderBottom: '1.5px solid #0f2d55', marginBottom: 6, height: 32 }} />
+                <div style={{ fontSize: 9, color: '#0f2d55', fontWeight: 700, letterSpacing: 0.3 }}>{role}</div>
+                <div style={{ fontSize: 8, color: '#9ca3af', marginTop: 1 }}>Assinatura / Carimbo</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* ── Professional Dashboard Export Header ─────────────────────── */
+  const DashHeader = () => {
+    const turma    = `${reportData?.classData?.grade_year || ''} ${reportData?.classData?.class_letter || ''}`.trim();
+    const teacher  = reportData?.classData?.teachers?.name || '';
+    const today    = new Date().toLocaleDateString('pt-BR');
+    const schoolYr = schoolInfo.active_school_year || new Date().getFullYear();
+    const activeAssessed = activeBimestreData?.activeB?.assessed ?? 0;
+    const totalStudents  = reportData?.students?.length ?? 0;
+    const activeBim      = activeBimestreData?.activeB?.bimestre ?? '?';
+
+    const statsCards = [
+      { label: 'Total de Alunos',    value: totalStudents,                        color: '#0f2d55', bg: '#e8f0fb' },
+      { label: 'Avaliados',          value: activeAssessed,                       color: '#15803d', bg: '#dcfce7' },
+      { label: 'Não Avaliados',      value: totalStudents - activeAssessed,       color: '#b45309', bg: '#fef3c7' },
+      { label: `${activeBim}º Bimestre`, value: 'Selecionado', color: '#1d4ed8', bg: '#dbeafe' },
+    ];
+
+    return (
+      <div style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
+        {/* ── Top gradient band ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2d55 0%, #1a4a7a 60%, #1e5799 100%)',
+          padding: '20px 28px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 20,
+        }}>
+          <img
+            src={schoolLogo}
+            alt="Logo"
+            style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))' }}
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 8.5, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>
+              Secretaria Municipal de Educação
+            </div>
+            <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: 0.3, lineHeight: 1.2 }}>
+              {schoolInfo.name || 'E.M.E.F Roseli Paiva'}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9.5, marginTop: 3 }}>
+              {schoolInfo.city || ''} &nbsp;·&nbsp; Ano Letivo: {schoolYr}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 8,
+            padding: '10px 16px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 7.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 }}>Documento Oficial</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Dashboard de Resultados</div>
+            <div style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>Sondagem</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, marginTop: 4 }}>{today}</div>
+          </div>
+        </div>
+
+        {/* ── Meta row ── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '3px solid #0f2d55',
+          background: '#f0f5fc',
+        }}>
+          {[
+            { label: 'PROFESSOR(A)',       value: teacher },
+            { label: 'TURMA',              value: turma },
+            { label: 'COORDENADOR(A)',     value: reportData?.coordinatorName || '' },
+            { label: 'DATA DE EMISSÃO',    value: today },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: i === 0 || i === 2 ? 2 : 1,
+              padding: '8px 14px',
+              borderRight: i < 3 ? '1px solid #c8d8ec' : 'none',
+            }}>
+              <div style={{ color: '#4a6fa5', fontSize: 7.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: '#0f2d55', fontSize: 11, fontWeight: 600 }}>
+                {item.value || <span style={{ color: '#aaa', fontStyle: 'italic', fontWeight: 400 }}>Não informado</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Stats cards row ── */}
+        <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #dde6f0', padding: '14px 20px', gap: 12 }}>
+          {statsCards.map((s, i) => (
+            <div key={i} style={{
+              flex: 1,
+              background: s.bg,
+              border: `1px solid ${s.color}30`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              textAlign: 'center',
+            }}>
+              <div style={{ color: s.color, fontSize: 24, fontWeight: 900, lineHeight: 1 }}>
+                {s.value}
+              </div>
+              <div style={{ color: s.color, fontSize: 8.5, fontWeight: 600, marginTop: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   /* ── JSX ─────────────────────────────────────────────────────── */
@@ -695,7 +874,8 @@ const ReportsPage: React.FC = () => {
               <Button
                 variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadPNG(tableRef, `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`, true)}
+                onClick={() => handleDownloadPNG(tableRef,
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.png`, true)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.png')
@@ -706,7 +886,8 @@ const ReportsPage: React.FC = () => {
               <Button
                 variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadPDF(tableRef, `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, true)}
+                onClick={() => handleDownloadPDF(tableRef,
+                  `planilha-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}.pdf`, true)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('planilha') && generating?.endsWith('.pdf')
@@ -719,6 +900,7 @@ const ReportsPage: React.FC = () => {
             {/* Dashboard actions */}
             <div className="flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border">
               <span className="text-xs text-muted-foreground font-bold uppercase tracking-wide w-full mb-1">📊 Gráficos</span>
+              {/* Bimestre selector */}
               <div className="w-full mb-1">
                 <p className="text-xs text-muted-foreground mb-1">Bimestre dos gráficos:</p>
                 <div className="flex gap-1.5 flex-wrap">
@@ -750,7 +932,8 @@ const ReportsPage: React.FC = () => {
               <Button
                 variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadPNG(dashRef, `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.png`)}
+                onClick={() => handleDownloadPNG(dashRef,
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.png`)}
                 className="gap-1.5 h-8 text-xs"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.png')
@@ -761,7 +944,8 @@ const ReportsPage: React.FC = () => {
               <Button
                 variant="outline" size="sm"
                 disabled={!!generating}
-                onClick={() => handleDownloadPDF(dashRef, `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.pdf`, false)}
+                onClick={() => handleDownloadPDF(dashRef,
+                  `graficos-${reportData.classData?.grade_year}-${reportData.classData?.class_letter}-${activeBimestreData?.activeB?.bimestre}bim.pdf`, false)}
                 className="gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 {generating?.includes('graficos') && generating?.endsWith('.pdf')
@@ -773,14 +957,14 @@ const ReportsPage: React.FC = () => {
           </div>
 
           {/* ════════════════════════════════════════════════
-              SECTION 1 — PRINTABLE TABLE
+              SECTION 1 — PRINTABLE TABLE (reference layout)
           ════════════════════════════════════════════════ */}
           <div
             id="print-table-section"
             className="print-section bg-white rounded-2xl overflow-hidden border border-border shadow-card"
             ref={tableRef}
           >
-            <SpreadsheetTable reportData={reportData} schoolInfo={schoolInfo} />
+            <SpreadsheetTable />
           </div>
 
           {/* ════════════════════════════════════════════════
@@ -792,10 +976,12 @@ const ReportsPage: React.FC = () => {
             ref={dashRef}
             style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}
           >
-            <DashHeader reportData={reportData} schoolInfo={schoolInfo} activeBimestreData={activeBimestreData} />
+            {/* Professional header with logo + meta + stats */}
+            <DashHeader />
 
             {/* Charts area */}
             <div style={{ padding: '20px 24px 0', background: '#f8fafc' }}>
+              {/* Section title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <div style={{ width: 4, height: 22, background: '#0f2d55', borderRadius: 2 }} />
                 <span style={{ color: '#0f2d55', fontSize: 13, fontWeight: 800, letterSpacing: 0.3 }}>
@@ -803,6 +989,7 @@ const ReportsPage: React.FC = () => {
                 </span>
               </div>
 
+              {/* 3-column chart grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.1fr', gap: 16, marginBottom: 16 }}>
 
                 {/* ── Writing Donut ── */}
@@ -827,7 +1014,14 @@ const ReportsPage: React.FC = () => {
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
                           <Pie data={activeBimestreData?.writingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
-                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false} label={renderPieLabel}>
+                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                              if (percent < 0.05) return null;
+                              const R = Math.PI / 180;
+                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
+                            }}
+                          >
                             {activeBimestreData?.writingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
@@ -861,7 +1055,14 @@ const ReportsPage: React.FC = () => {
                       <ResponsiveContainer width="100%" height={160}>
                         <PieChart>
                           <Pie data={activeBimestreData?.readingChartData.filter((d: any) => d.value > 0)} cx="50%" cy="50%"
-                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false} label={renderPieLabel}>
+                            innerRadius={38} outerRadius={72} dataKey="value" paddingAngle={2} labelLine={false}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                              if (percent < 0.05) return null;
+                              const R = Math.PI / 180;
+                              const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              return <text x={cx + r * Math.cos(-midAngle * R)} y={cy + r * Math.sin(-midAngle * R)} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">{`${Math.round(percent * 100)}%`}</text>;
+                            }}
+                          >
                             {activeBimestreData?.readingChartData.filter((d: any) => d.value > 0).map((e: any, i: number) => (
                               <Cell key={i} fill={e.color} />
                             ))}
@@ -886,10 +1087,15 @@ const ReportsPage: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} />
                       <YAxis tick={{ fontSize: 10, fill: '#475569' }} unit="%" domain={[0, 100]} />
-                      <Tooltip formatter={(v: any, n: any) => [`${v}%`, n]} contentStyle={{ fontSize: '10px', borderRadius: '8px', border: '1px solid #dde6f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                      <Tooltip
+                        formatter={(v: any, n: any) => [`${v}%`, n]}
+                        contentStyle={{ fontSize: '10px', borderRadius: '8px', border: '1px solid #dde6f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      />
                       <Legend wrapperStyle={{ fontSize: '10px' }} />
-                      <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 5, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }} />
-                      <Line type="monotone" dataKey="Leu Texto" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
+                      <Line type="monotone" dataKey="Alfabético" stroke="#22c55e" strokeWidth={2.5}
+                        dot={{ r: 5, fill: '#22c55e', stroke: '#fff', strokeWidth: 2 }} />
+                      <Line type="monotone" dataKey="Leu Texto" stroke="#3b82f6" strokeWidth={2.5}
+                        dot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -898,6 +1104,7 @@ const ReportsPage: React.FC = () => {
 
             {/* ── Legend + Footer ── */}
             <div style={{ padding: '14px 24px 20px', background: '#f8fafc', borderTop: '1px solid #dde6f0' }}>
+              {/* Legend pills */}
               <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: 8.5, fontWeight: 700, color: '#4a6fa5', letterSpacing: 0.8, textTransform: 'uppercase', marginRight: 6 }}>Escrita:</span>
@@ -919,6 +1126,7 @@ const ReportsPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Footer */}
               <div style={{ borderTop: '1px solid #c8d8ec', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 8, color: '#94a3b8' }}>
                   Documento gerado automaticamente pelo Sistema de Sondagem · {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

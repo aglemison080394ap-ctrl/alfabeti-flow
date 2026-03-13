@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard, AlertCircle, RefreshCw } from 'lucide-react';
+import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard } from 'lucide-react';
 
 const WRITING_LEVELS = {
   PS: { label: 'Pré-silábico',    color: '#ef4444', short: 'PS' },
@@ -26,105 +26,11 @@ const READING_LEVELS = {
 
 const GRADE_YEARS = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 
-/* ── Stable donut label (outside any component to prevent re-render loops) ── */
-const renderDonutLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  if (percent < 0.05) return null;
-  const RADIAN = Math.PI / 180;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * RADIAN);
-  const y = cy + r * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
-      {`${Math.round(percent * 100)}%`}
-    </text>
-  );
-};
-
-/* ── DonutCard — defined OUTSIDE Dashboard to avoid re-creation on every render ── */
-const DonutCard = React.memo(({
-  title, icon: Icon, data, assessed, loading, selectedBimestre,
-}: {
-  title: string; icon: React.ElementType; data: any[]; assessed: number;
-  loading: boolean; selectedBimestre: string;
-}) => (
-  <Card className="p-5 shadow-card">
-    <div className="flex items-center gap-2 mb-4">
-      <Icon className="w-5 h-5 text-primary" />
-      <h3 className="font-display font-bold text-foreground">{title}</h3>
-      <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-        {selectedBimestre}º Bimestre
-      </span>
-    </div>
-    <div className="flex gap-4 items-center">
-      <div className="flex flex-col gap-2 w-36 shrink-0">
-        <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
-          <p className="text-xl font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
-          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Avaliados</p>
-        </div>
-        {data.map(item => (
-          <div key={item.short} className="rounded-lg px-3 py-1.5 flex items-center justify-between"
-            style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}>
-            <span className="text-xs font-bold" style={{ color: item.color }}>{item.short}</span>
-            <span className="text-sm font-display font-bold text-foreground">{loading ? '…' : item.value}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex-1 flex flex-col items-center">
-        {assessed > 0 ? (
-          <>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={data.filter(d => d.value > 0)}
-                  cx="50%" cy="50%"
-                  innerRadius={50} outerRadius={98}
-                  dataKey="value" paddingAngle={2}
-                  labelLine={false} label={renderDonutLabel}
-                >
-                  {data.filter(d => d.value > 0).map((entry: any, i: number) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: any, _n: any, p: any) => [`${v} alunos (${p.payload.pct}%)`, p.payload.name]}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '0.5rem',
-                    fontSize: '12px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 -mt-2">
-              {data.map(item => (
-                <div key={item.short} className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-[10px] text-muted-foreground">{item.short} – {item.name}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
-            <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
-              <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
-            </div>
-            <p>Sem dados</p>
-          </div>
-        )}
-      </div>
-    </div>
-  </Card>
-));
-
 const Dashboard: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const [allClasses, setAllClasses] = useState<any[]>([]);
-  const [classesError, setClassesError] = useState<string | null>(null);
-  const [dashError, setDashError] = useState<string | null>(null);
 
-  // Admin filters
+  // Admin filters: selectedYear, selectedLetter, isOverallView (Visão Geral da Escola)
   const [selectedYear, setSelectedYear]         = useState<string>('1º Ano');
   const [selectedLetter, setSelectedLetter]     = useState<string>('A');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
@@ -143,31 +49,29 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!profile) return;
     const loadClasses = async () => {
-      setClassesError(null);
-      try {
-        if (isAdmin) {
-          const { data, error } = await supabase
-            .from('classes').select('id, grade_year, class_letter, school_year').order('grade_year');
-          if (error) throw error;
-          setAllClasses(data || []);
-        } else {
-          const { data: teacherData, error: tErr } = await supabase
-            .from('teachers').select('id').eq('user_id', profile.user_id).maybeSingle();
-          if (tErr) throw tErr;
-          if (teacherData) {
-            const { data, error } = await supabase
-              .from('classes').select('id, grade_year, class_letter, school_year')
-              .eq('teacher_id', teacherData.id).order('grade_year');
-            if (error) throw error;
-            const classList = data || [];
-            setAllClasses(classList);
-            if (classList.length > 0) setSelectedClass(classList[0].id);
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('classes')
+          .select('id, grade_year, class_letter, school_year')
+          .order('grade_year');
+        if (data) setAllClasses(data);
+      } else {
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
+        if (teacherData) {
+          const { data } = await supabase
+            .from('classes')
+            .select('id, grade_year, class_letter, school_year')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setAllClasses(data);
+            if (data.length > 0) setSelectedClass(data[0].id);
           }
         }
-      } catch (err: any) {
-        console.error('[Dashboard] loadClasses:', err);
-        setClassesError(err?.message || 'Erro ao carregar turmas.');
-        setLoading(false);
       }
     };
     loadClasses();
@@ -186,9 +90,13 @@ const Dashboard: React.FC = () => {
     return filtered.map(c => c.id);
   })();
 
-  const fetchDashboardData = React.useCallback(async () => {
+  useEffect(() => {
+    fetchDashboardData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
+
+  const fetchDashboardData = async () => {
     setLoading(true);
-    setDashError(null);
     try {
       let classFilter: string[];
       if (isAdmin) {
@@ -214,8 +122,7 @@ const Dashboard: React.FC = () => {
       if (classFilter.length > 0) {
         studentsQuery = studentsQuery.in('class_id', classFilter);
       }
-      const { data: students, error: sErr } = await studentsQuery;
-      if (sErr) throw sErr;
+      const { data: students } = await studentsQuery;
       const studentIds    = students?.map(s => s.id) ?? [];
       const totalStudents = studentIds.length;
       const totalClasses  = classFilter.length;
@@ -229,17 +136,17 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      const { data: allAssessments, error: aErr } = await supabase
+      const { data: allAssessments } = await supabase
         .from('assessments')
         .select('student_id, bimestre, writing_level, reading_level')
         .in('student_id', studentIds.slice(0, 500));
-      if (aErr) throw aErr;
 
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
       const assessed   = currentBim.length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
+      // Writing counts
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
       setWritingData(
@@ -252,6 +159,7 @@ const Dashboard: React.FC = () => {
         }))
       );
 
+      // Reading counts
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
       setReadingData(
@@ -264,6 +172,7 @@ const Dashboard: React.FC = () => {
         }))
       );
 
+      // Evolution across 4 bimestres
       const evo = (['1','2','3','4'] as const).map(b => {
         const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
         const total = bData.length;
@@ -274,20 +183,107 @@ const Dashboard: React.FC = () => {
         };
       });
       setEvolutionData(evo);
-    } catch (err: any) {
-      console.error('[Dashboard] fetchDashboardData:', err);
-      setDashError(err?.message || 'Erro ao carregar dados do dashboard.');
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, selectedLetter, selectedBimestre, selectedClass, allClasses, isOverallView]);
+  };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  // ── Donut Card ─────────────────────────────────────────────────────────────
+  const DonutCard = ({
+    title, icon: Icon, data, assessed,
+  }: {
+    title: string; icon: React.ElementType; data: any[]; assessed: number;
+  }) => {
+    const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+      if (percent < 0.05) return null;
+      const RADIAN = Math.PI / 180;
+      const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+      const x = cx + r * Math.cos(-midAngle * RADIAN);
+      const y = cy + r * Math.sin(-midAngle * RADIAN);
+      return (
+        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
+          {`${Math.round(percent * 100)}%`}
+        </text>
+      );
+    };
 
-  // DonutCard is defined outside the component (see below) — no inline definition needed
+    return (
+      <Card className="p-5 shadow-card">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon className="w-5 h-5 text-primary" />
+          <h3 className="font-display font-bold text-foreground">{title}</h3>
+          <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {selectedBimestre}º Bimestre
+          </span>
+        </div>
+        <div className="flex gap-4 items-center">
+          {/* Left: stat cards */}
+          <div className="flex flex-col gap-2 w-36 shrink-0">
+            <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
+              <p className="text-xl font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Avaliados</p>
+            </div>
+            {data.map(item => (
+              <div key={item.short} className="rounded-lg px-3 py-1.5 flex items-center justify-between"
+                style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}>
+                <span className="text-xs font-bold" style={{ color: item.color }}>{item.short}</span>
+                <span className="text-sm font-display font-bold text-foreground">{loading ? '…' : item.value}</span>
+              </div>
+            ))}
+          </div>
+          {/* Right: fat donut */}
+          <div className="flex-1 flex flex-col items-center">
+            {assessed > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={data.filter(d => d.value > 0)}
+                      cx="50%" cy="50%"
+                      innerRadius={50}
+                      outerRadius={98}
+                      dataKey="value"
+                      paddingAngle={2}
+                      labelLine={false}
+                      label={renderLabel}
+                    >
+                      {data.filter(d => d.value > 0).map((entry: any, i: number) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: any, _n: any, p: any) => [`${v} alunos (${p.payload.pct}%)`, p.payload.name]}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '0.5rem',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 -mt-2">
+                  {data.map(item => (
+                    <div key={item.short} className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-[10px] text-muted-foreground">{item.short} – {item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+                <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
+                  <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
+                </div>
+                <p>Sem dados</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  };
 
   // Context label
   const contextLabel = (() => {
@@ -313,32 +309,11 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* ─── Error states (locais — não derrubam o app) ─── */}
-        {classesError && (
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1">{classesError}</span>
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="gap-1.5 text-xs">
-              <RefreshCw className="w-3 h-3" /> Recarregar
-            </Button>
-          </div>
-        )}
-        {dashError && !classesError && (
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1">{dashError}</span>
-            <Button variant="outline" size="sm" onClick={fetchDashboardData} className="gap-1.5 text-xs">
-              <RefreshCw className="w-3 h-3" /> Tentar novamente
-            </Button>
-          </div>
-        )}
-
         {/* ─── Filter Bar ─── */}
         {isAdmin && (
           <div className="flex flex-wrap items-center gap-3">
             {/* LEFT: Série + Turma + Bimestre */}
             <div className="flex flex-wrap items-center gap-3 flex-1">
-
               {/* 1º Filtro: Série/Ano */}
               <Select
                 value={selectedYear}
@@ -479,8 +454,8 @@ const Dashboard: React.FC = () => {
 
       {/* Donut Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <DonutCard title="Níveis de Escrita" icon={PenLine}  data={writingData} assessed={stats.assessed} loading={loading} selectedBimestre={selectedBimestre} />
-        <DonutCard title="Níveis de Leitura" icon={BookOpen} data={readingData} assessed={stats.assessed} loading={loading} selectedBimestre={selectedBimestre} />
+        <DonutCard title="Níveis de Escrita" icon={PenLine}  data={writingData} assessed={stats.assessed} />
+        <DonutCard title="Níveis de Leitura" icon={BookOpen} data={readingData} assessed={stats.assessed} />
       </div>
 
       {/* Evolution Line Chart */}

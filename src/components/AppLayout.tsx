@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -20,33 +20,29 @@ const navItems = [
   { icon: Settings,        label: 'Configurações', path: '/configuracoes', roles: ['admin'] },
 ];
 
-function getInitials(name: string) {
-  return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+interface AppLayoutProps {
+  children: React.ReactNode;
 }
 
-/* ─── Sidebar content extracted as a stable component outside AppLayout ─── */
-interface SidebarContentProps {
-  pathname: string;
-  profileName: string | undefined;
-  profileRole: string | undefined;
-  isAdmin: boolean;
-  onClose: () => void;
-  onSignOut: () => void;
-}
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const { profile, isAdmin, signOut } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-const SidebarContent = memo(({
-  pathname,
-  profileName,
-  profileRole,
-  isAdmin,
-  onClose,
-  onSignOut,
-}: SidebarContentProps) => {
   const visibleItems = navItems.filter(item =>
     item.roles.includes(isAdmin ? 'admin' : 'teacher')
   );
 
-  return (
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  const getInitials = (name: string) =>
+    name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+
+  const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-5 border-b border-sidebar-border">
@@ -66,12 +62,12 @@ const SidebarContent = memo(({
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
         {visibleItems.map((item) => {
-          const isActive = pathname === item.path;
+          const isActive = location.pathname === item.path;
           return (
             <Link
               key={item.path}
               to={item.path}
-              onClick={onClose}
+              onClick={() => setSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group",
                 isActive
@@ -95,21 +91,21 @@ const SidebarContent = memo(({
         <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/50">
           <Avatar className="w-9 h-9 flex-shrink-0">
             <AvatarFallback className="bg-primary text-white text-sm font-bold">
-              {profileName ? getInitials(profileName) : 'U'}
+              {profile?.name ? getInitials(profile.name) : 'U'}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sidebar-foreground font-medium text-sm truncate">
-              {profileName || 'Usuário'}
+              {profile?.name || 'Usuário'}
             </p>
             <p className="text-sidebar-foreground/60 text-xs capitalize">
-              {profileRole === 'admin' ? '👑 Administrador' : '🎓 Professor'}
+              {profile?.role === 'admin' ? '👑 Administrador' : '🎓 Professor'}
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            onClick={onSignOut}
+            onClick={handleSignOut}
             className="flex-shrink-0 text-sidebar-foreground/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg"
             title="Sair"
           >
@@ -119,40 +115,12 @@ const SidebarContent = memo(({
       </div>
     </div>
   );
-});
-
-SidebarContent.displayName = 'SidebarContent';
-
-/* ─── Main layout ─── */
-interface AppLayoutProps {
-  children: React.ReactNode;
-}
-
-const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { profile, isAdmin, signOut } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
-  };
-
-  const handleClose = () => setSidebarOpen(false);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col bg-sidebar shadow-sidebar border-r border-sidebar-border">
-        <SidebarContent
-          pathname={location.pathname}
-          profileName={profile?.name}
-          profileRole={profile?.role}
-          isAdmin={isAdmin}
-          onClose={handleClose}
-          onSignOut={handleSignOut}
-        />
+        <SidebarContent />
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -160,17 +128,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={handleClose}
+            onClick={() => setSidebarOpen(false)}
           />
           <aside className="relative w-64 flex-shrink-0 flex flex-col bg-sidebar shadow-sidebar animate-slide-in-left">
-            <SidebarContent
-              pathname={location.pathname}
-              profileName={profile?.name}
-              profileRole={profile?.role}
-              isAdmin={isAdmin}
-              onClose={handleClose}
-              onSignOut={handleSignOut}
-            />
+            <SidebarContent />
           </aside>
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { ClipboardList, Search, Save, AlertCircle, RefreshCw } from 'lucide-react';
+import { ClipboardList, Search, Save } from 'lucide-react';
 
 const WRITING_LEVELS = [
   { value: 'PS', label: 'PS — Pré-silábico', desc: 'Não estabelece relação letra-som', className: 'level-ps' },
@@ -39,77 +39,66 @@ const AssessmentsPage: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState<string | null>(null);
-  const [loadingClasses, setLoadingClasses] = useState(true);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [classesError, setClassesError] = useState<string | null>(null);
-  const [studentsError, setStudentsError] = useState<string | null>(null);
 
-  const loadClasses = useCallback(async () => {
+  // Load only teacher's own classes (or all for admin)
+  useEffect(() => {
     if (!profile) return;
-    setLoadingClasses(true);
-    setClassesError(null);
-    try {
+    const loadClasses = async () => {
       if (isAdmin) {
-        const { data, error } = await supabase.from('classes').select('*, teachers(name)').order('grade_year');
-        if (error) throw error;
-        setClasses(data || []);
+        const { data } = await supabase
+          .from('classes')
+          .select('*, teachers(name)')
+          .order('grade_year');
+        if (data) setClasses(data);
       } else {
-        const { data: teacherData, error: tErr } = await supabase
-          .from('teachers').select('id').eq('user_id', profile.user_id).maybeSingle();
-        if (tErr) throw tErr;
+        const { data: teacherData } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
         if (teacherData) {
-          const { data, error } = await supabase
-            .from('classes').select('*, teachers(name)').eq('teacher_id', teacherData.id).order('grade_year');
-          if (error) throw error;
-          const classList = data || [];
-          setClasses(classList);
-          if (classList.length > 0 && !selectedClass) setSelectedClass(classList[0].id);
+          const { data } = await supabase
+            .from('classes')
+            .select('*, teachers(name)')
+            .eq('teacher_id', teacherData.id)
+            .order('grade_year');
+          if (data) {
+            setClasses(data);
+            if (data.length > 0 && !selectedClass) setSelectedClass(data[0].id);
+          }
         }
       }
-    } catch (err: any) {
-      console.error('[AssessmentsPage] loadClasses:', err);
-      setClassesError(err?.message || 'Erro ao carregar turmas.');
-    } finally {
-      setLoadingClasses(false);
-    }
+    };
+    loadClasses();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, isAdmin]);
 
-  useEffect(() => { loadClasses(); }, [loadClasses]);
-
-  const fetchStudentsAndAssessments = useCallback(async () => {
+  useEffect(() => {
     if (!selectedClass) return;
-    setLoadingStudents(true);
-    setStudentsError(null);
-    try {
-      const { data: studentsData, error: sErr } = await supabase
-        .from('students').select('*').eq('class_id', selectedClass).order('name');
-      if (sErr) throw sErr;
-
-      const studentList = studentsData || [];
-      setStudents(studentList);
-
-      if (studentList.length > 0) {
-        const ids = studentList.map(s => s.id);
-        const { data: assessmentsData, error: aErr } = await supabase
-          .from('assessments').select('*').in('student_id', ids).eq('bimestre', selectedBimestre as any);
-        if (aErr) throw aErr;
-
-        const assessmentsMap: Record<string, any> = {};
-        assessmentsData?.forEach(a => { assessmentsMap[a.student_id] = a; });
-        setAssessments(assessmentsMap);
-      } else {
-        setAssessments({});
-      }
-    } catch (err: any) {
-      console.error('[AssessmentsPage] fetchStudentsAndAssessments:', err);
-      setStudentsError(err?.message || 'Erro ao carregar alunos.');
-    } finally {
-      setLoadingStudents(false);
-    }
+    fetchStudentsAndAssessments();
   }, [selectedClass, selectedBimestre]);
 
-  useEffect(() => { fetchStudentsAndAssessments(); }, [fetchStudentsAndAssessments]);
+  const fetchStudentsAndAssessments = async () => {
+    const { data: studentsData } = await supabase
+      .from('students')
+      .select('*')
+      .eq('class_id', selectedClass)
+      .order('name');
+
+    if (studentsData) {
+      setStudents(studentsData);
+      const ids = studentsData.map(s => s.id);
+      const { data: assessmentsData } = await supabase
+        .from('assessments')
+        .select('*')
+        .in('student_id', ids)
+        .eq('bimestre', selectedBimestre as any);
+
+      const assessmentsMap: Record<string, any> = {};
+      assessmentsData?.forEach(a => { assessmentsMap[a.student_id] = a; });
+      setAssessments(assessmentsMap);
+    }
+  };
 
   const openEdit = (student: any) => {
     const existing = assessments[student.id];
@@ -125,29 +114,29 @@ const AssessmentsPage: React.FC = () => {
   const handleSave = async () => {
     if (!editingStudent) return;
     setSaving(editingStudent.id);
-    try {
-      const payload = {
-        student_id: editingStudent.id,
-        bimestre: selectedBimestre as '1' | '2' | '3' | '4',
-        writing_level: editForm.writing_level || null,
-        reading_level: editForm.reading_level || null,
-        absences: parseInt(editForm.absences) || 0,
-        notes: editForm.notes || null,
-      };
-      const existing = assessments[editingStudent.id];
-      const { error } = existing
-        ? await supabase.from('assessments').update(payload).eq('id', existing.id)
-        : await supabase.from('assessments').insert(payload);
-      if (error) throw error;
+
+    const payload = {
+      student_id: editingStudent.id,
+      bimestre: selectedBimestre as '1' | '2' | '3' | '4',
+      writing_level: editForm.writing_level || null,
+      reading_level: editForm.reading_level || null,
+      absences: parseInt(editForm.absences) || 0,
+      notes: editForm.notes || null,
+    };
+
+    const existing = assessments[editingStudent.id];
+    const { error } = existing
+      ? await supabase.from('assessments').update(payload).eq('id', existing.id)
+      : await supabase.from('assessments').insert(payload);
+
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } else {
       toast({ title: 'Sondagem salva!', description: `${editingStudent.name} — ${selectedBimestre}º Bimestre` });
       setEditingStudent(null);
       fetchStudentsAndAssessments();
-    } catch (err: any) {
-      console.error('[AssessmentsPage] handleSave:', err);
-      toast({ title: 'Erro', description: err?.message, variant: 'destructive' });
-    } finally {
-      setSaving(null);
     }
+    setSaving(null);
   };
 
   const getWritingBadge = (level: string | null) => {
@@ -165,6 +154,7 @@ const AssessmentsPage: React.FC = () => {
   const filteredStudents = students.filter(s =>
     !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
   return (
@@ -174,152 +164,135 @@ const AssessmentsPage: React.FC = () => {
         <p className="text-muted-foreground mt-0.5">Registre os níveis de leitura e escrita por bimestre</p>
       </div>
 
-      {classesError ? (
-        <Card className="p-8 text-center space-y-3">
-          <AlertCircle className="w-10 h-10 text-destructive mx-auto opacity-70" />
-          <p className="text-destructive font-medium text-sm">{classesError}</p>
-          <Button variant="outline" size="sm" onClick={loadClasses} className="gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
-          </Button>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-full sm:w-56 bg-card">
+            <SelectValue placeholder="Selecione a turma" />
+          </SelectTrigger>
+          <SelectContent>
+            {classes.map(c => (
+              <SelectItem key={c.id} value={c.id}>{c.grade_year} {c.class_letter}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
+          <SelectTrigger className="w-full sm:w-44 bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {['1', '2', '3', '4'].map(b => (
+              <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedClass && (
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar aluno..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 bg-card"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-muted-foreground font-medium">Escrita:</span>
+          {WRITING_LEVELS.map(l => (
+            <Badge key={l.value} variant="outline" className={cn("text-xs", l.className)}>{l.value}</Badge>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-muted-foreground font-medium">Leitura:</span>
+          {READING_LEVELS.map(l => (
+            <Badge key={l.value} variant="outline" className={cn("text-xs", l.className)}>{l.value}</Badge>
+          ))}
+        </div>
+      </div>
+
+      {!selectedClass ? (
+        <Card className="p-12 text-center">
+          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-muted-foreground font-medium">Selecione uma turma para começar</p>
+        </Card>
+      ) : filteredStudents.length === 0 ? (
+        <Card className="p-12 text-center">
+          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-muted-foreground font-medium">Nenhum aluno nesta turma</p>
+          <p className="text-muted-foreground text-sm mt-1">Cadastre alunos na seção "Alunos".</p>
         </Card>
       ) : (
         <>
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={selectedClass} onValueChange={setSelectedClass} disabled={loadingClasses}>
-              <SelectTrigger className="w-full sm:w-56 bg-card">
-                <SelectValue placeholder={loadingClasses ? 'Carregando...' : 'Selecione a turma'} />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.grade_year} {c.class_letter}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
-              <SelectTrigger className="w-full sm:w-44 bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['1', '2', '3', '4'].map(b => (
-                  <SelectItem key={b} value={b}>{b}º Bimestre</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedClass && (
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar aluno..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-card"
-                />
-              </div>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="font-display font-bold text-foreground">
+                {selectedClassData?.grade_year} {selectedClassData?.class_letter}
+              </h2>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                {selectedBimestre}º Bimestre
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {Object.keys(assessments).length}/{students.length} avaliados
+            </p>
           </div>
 
-          {/* Legend */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground font-medium">Escrita:</span>
-              {WRITING_LEVELS.map(l => (
-                <Badge key={l.value} variant="outline" className={cn("text-xs", l.className)}>{l.value}</Badge>
-              ))}
+          <Card className="overflow-hidden shadow-card">
+            {/* Header */}
+            <div className="hidden sm:grid grid-cols-[2rem_1fr_7rem_7rem_5rem_6rem] gap-3 px-5 py-3 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div>#</div>
+              <div>Nome</div>
+              <div>Escrita</div>
+              <div>Leitura</div>
+              <div>Faltas</div>
+              <div></div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground font-medium">Leitura:</span>
-              {READING_LEVELS.map(l => (
-                <Badge key={l.value} variant="outline" className={cn("text-xs", l.className)}>{l.value}</Badge>
-              ))}
-            </div>
-          </div>
-
-          {!selectedClass ? (
-            <Card className="p-12 text-center">
-              <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-              <p className="text-muted-foreground font-medium">Selecione uma turma para começar</p>
-            </Card>
-          ) : studentsError ? (
-            <Card className="p-8 text-center space-y-3">
-              <AlertCircle className="w-10 h-10 text-destructive mx-auto opacity-70" />
-              <p className="text-destructive font-medium text-sm">{studentsError}</p>
-              <Button variant="outline" size="sm" onClick={fetchStudentsAndAssessments} className="gap-2">
-                <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
-              </Button>
-            </Card>
-          ) : loadingStudents ? (
-            <div className="space-y-2">
-              {[1,2,3,4,5].map(i => <Card key={i} className="p-4 animate-pulse h-16 bg-muted" />)}
-            </div>
-          ) : filteredStudents.length === 0 ? (
-            <Card className="p-12 text-center">
-              <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-              <p className="text-muted-foreground font-medium">Nenhum aluno nesta turma</p>
-              <p className="text-muted-foreground text-sm mt-1">Cadastre alunos na seção "Alunos".</p>
-            </Card>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-display font-bold text-foreground">
-                    {selectedClassData?.grade_year} {selectedClassData?.class_letter}
-                  </h2>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                    {selectedBimestre}º Bimestre
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {Object.keys(assessments).length}/{students.length} avaliados
-                </p>
-              </div>
-
-              <Card className="overflow-hidden shadow-card">
-                <div className="hidden sm:grid grid-cols-[2rem_1fr_7rem_7rem_5rem_6rem] gap-3 px-5 py-3 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  <div>#</div><div>Nome</div><div>Escrita</div><div>Leitura</div><div>Faltas</div><div></div>
-                </div>
-                <div className="divide-y divide-border">
-                  {filteredStudents.map((student, idx) => {
-                    const assessment = assessments[student.id];
-                    return (
-                      <div key={student.id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 text-sm text-muted-foreground font-mono flex-shrink-0">{idx + 1}</span>
-                          <span className="flex-1 font-medium text-foreground truncate">{student.name}</span>
-                          <div className="hidden sm:flex items-center gap-3">
-                            <div className="w-28">{getWritingBadge(assessment?.writing_level)}</div>
-                            <div className="w-28">{getReadingBadge(assessment?.reading_level)}</div>
-                            <div className="w-20 text-sm text-muted-foreground">
-                              {assessment?.absences ?? '—'} faltas
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant={assessment ? 'outline' : 'default'}
-                            onClick={() => openEdit(student)}
-                            className={cn(
-                              "gap-1 flex-shrink-0 rounded-lg",
-                              !assessment && "gradient-primary text-primary-foreground"
-                            )}
-                          >
-                            <ClipboardList className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{assessment ? 'Editar' : 'Registrar'}</span>
-                          </Button>
-                        </div>
-                        <div className="flex sm:hidden items-center gap-2 mt-2 ml-11">
-                          {getWritingBadge(assessment?.writing_level)}
-                          {getReadingBadge(assessment?.reading_level)}
-                          {assessment?.absences !== undefined && (
-                            <span className="text-xs text-muted-foreground">{assessment.absences} faltas</span>
-                          )}
+            <div className="divide-y divide-border">
+              {filteredStudents.map((student, idx) => {
+                const assessment = assessments[student.id];
+                return (
+                  <div key={student.id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 text-sm text-muted-foreground font-mono flex-shrink-0">{idx + 1}</span>
+                      <span className="flex-1 font-medium text-foreground truncate">{student.name}</span>
+                      <div className="hidden sm:flex items-center gap-3">
+                        <div className="w-28">{getWritingBadge(assessment?.writing_level)}</div>
+                        <div className="w-28">{getReadingBadge(assessment?.reading_level)}</div>
+                        <div className="w-20 text-sm text-muted-foreground">
+                          {assessment?.absences ?? '—'} faltas
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            </>
-          )}
+                      <Button
+                        size="sm"
+                        variant={assessment ? 'outline' : 'default'}
+                        onClick={() => openEdit(student)}
+                        className={cn(
+                          "gap-1 flex-shrink-0 rounded-lg",
+                          !assessment && "gradient-primary text-primary-foreground"
+                        )}
+                      >
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{assessment ? 'Editar' : 'Registrar'}</span>
+                      </Button>
+                    </div>
+                    {/* Mobile levels */}
+                    <div className="flex sm:hidden items-center gap-2 mt-2 ml-11">
+                      {getWritingBadge(assessment?.writing_level)}
+                      {getReadingBadge(assessment?.reading_level)}
+                      {assessment?.absences !== undefined && (
+                        <span className="text-xs text-muted-foreground">{assessment.absences} faltas</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
         </>
       )}
 
@@ -333,6 +306,7 @@ const AssessmentsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">{selectedBimestre}º Bimestre</p>
           </DialogHeader>
           <div className="space-y-5 py-2">
+            {/* Writing level */}
             <div className="space-y-2">
               <Label className="font-medium">Nível de Escrita</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -353,6 +327,8 @@ const AssessmentsPage: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Reading level */}
             <div className="space-y-2">
               <Label className="font-medium">Nível de Leitura</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -372,6 +348,8 @@ const AssessmentsPage: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Absences */}
             <div className="space-y-2">
               <Label htmlFor="absences" className="font-medium">Faltas no Bimestre</Label>
               <Input
@@ -383,6 +361,8 @@ const AssessmentsPage: React.FC = () => {
                 className="w-32"
               />
             </div>
+
+            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes" className="font-medium">Observações</Label>
               <Textarea
@@ -393,6 +373,7 @@ const AssessmentsPage: React.FC = () => {
                 className="h-20"
               />
             </div>
+
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setEditingStudent(null)}>Cancelar</Button>
               <Button

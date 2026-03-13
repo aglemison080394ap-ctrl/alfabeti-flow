@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Pencil, Trash2, GraduationCap, Upload, Search, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, GraduationCap, Upload, Search } from 'lucide-react';
 
 const StudentsPage: React.FC = () => {
   const { toast } = useToast();
@@ -18,7 +18,6 @@ const StudentsPage: React.FC = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -29,51 +28,43 @@ const StudentsPage: React.FC = () => {
 
   const fetchAll = async () => {
     if (!profile) return;
-    setLoading(true);
-    setFetchError(null);
 
-    try {
-      let classesQuery = supabase.from('classes').select('id, grade_year, class_letter').order('grade_year');
-      let studentsQuery = supabase.from('students').select('*, classes(grade_year, class_letter)').order('name');
+    let classesQuery = supabase.from('classes').select('id, grade_year, class_letter').order('grade_year');
+    let studentsQuery = supabase.from('students').select('*, classes(grade_year, class_letter)').order('name');
 
-      if (!isAdmin) {
-        const { data: teacherData, error: tErr } = await supabase
-          .from('teachers').select('id').eq('user_id', profile.user_id).maybeSingle();
-        if (tErr) throw tErr;
+    // Teachers only see their own classes and students
+    if (!isAdmin) {
+      const { data: teacherData } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', profile.user_id)
+        .maybeSingle();
 
-        if (teacherData) {
-          classesQuery = classesQuery.eq('teacher_id', teacherData.id);
-          const { data: teacherClasses, error: cErr } = await classesQuery;
-          if (cErr) throw cErr;
-          if (teacherClasses && teacherClasses.length > 0) {
-            setClasses(teacherClasses);
-            const classIds = teacherClasses.map(c => c.id);
-            const { data: studentsData, error: sErr } = await studentsQuery.in('class_id', classIds);
-            if (sErr) throw sErr;
-            if (studentsData) setStudents(studentsData);
-          } else {
-            setClasses([]);
-            setStudents([]);
-          }
-          setLoading(false);
-          return;
+      if (teacherData) {
+        classesQuery = classesQuery.eq('teacher_id', teacherData.id);
+        // Fetch teacher's class IDs first, then filter students
+        const { data: teacherClasses } = await classesQuery;
+        if (teacherClasses && teacherClasses.length > 0) {
+          setClasses(teacherClasses);
+          const classIds = teacherClasses.map(c => c.id);
+          const { data: studentsData } = await studentsQuery.in('class_id', classIds);
+          if (studentsData) setStudents(studentsData);
+        } else {
+          setClasses([]);
+          setStudents([]);
         }
+        setLoading(false);
+        return;
       }
-
-      const [{ data: studentsData, error: sErr }, { data: classesData, error: cErr }] = await Promise.all([
-        studentsQuery,
-        classesQuery,
-      ]);
-      if (sErr) throw sErr;
-      if (cErr) throw cErr;
-      if (studentsData) setStudents(studentsData);
-      if (classesData) setClasses(classesData);
-    } catch (err: any) {
-      console.error('[StudentsPage] fetchAll:', err);
-      setFetchError(err?.message || 'Erro ao carregar alunos.');
-    } finally {
-      setLoading(false);
     }
+
+    const [{ data: studentsData }, { data: classesData }] = await Promise.all([
+      studentsQuery,
+      classesQuery,
+    ]);
+    if (studentsData) setStudents(studentsData);
+    if (classesData) setClasses(classesData);
+    setLoading(false);
   };
 
   useEffect(() => { fetchAll(); }, [profile]);
@@ -100,17 +91,17 @@ const StudentsPage: React.FC = () => {
       age: form.age ? parseInt(form.age) : null,
       class_id: form.class_id,
     };
-    try {
-      const { error } = editingStudent
-        ? await supabase.from('students').update(payload).eq('id', editingStudent.id)
-        : await supabase.from('students').insert(payload);
-      if (error) throw error;
-      toast({ title: editingStudent ? 'Aluno atualizado!' : 'Aluno cadastrado!' });
-      setDialogOpen(false);
-      fetchAll();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err?.message, variant: 'destructive' });
+    const { error } = editingStudent
+      ? await supabase.from('students').update(payload).eq('id', editingStudent.id)
+      : await supabase.from('students').insert(payload);
+
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      return;
     }
+    toast({ title: editingStudent ? 'Aluno atualizado!' : 'Aluno cadastrado!' });
+    setDialogOpen(false);
+    fetchAll();
   };
 
   const handleBulkImport = async () => {
@@ -123,32 +114,29 @@ const StudentsPage: React.FC = () => {
       toast({ title: 'Nenhum aluno', description: 'Cole a lista de alunos no campo de texto.', variant: 'destructive' });
       return;
     }
+
     const insertData = lines.map(line => ({
       name: line.replace(/^\d+[.)-\s]+/, '').trim(),
       class_id: bulkClassId,
     }));
-    try {
-      const { error } = await supabase.from('students').insert(insertData);
-      if (error) throw error;
-      toast({ title: `${lines.length} alunos importados!`, description: 'Lista importada com sucesso.' });
-      setBulkText('');
-      setDialogOpen(false);
-      fetchAll();
-    } catch (err: any) {
-      toast({ title: 'Erro na importação', description: err?.message, variant: 'destructive' });
+
+    const { error } = await supabase.from('students').insert(insertData);
+    if (error) {
+      toast({ title: 'Erro na importação', description: error.message, variant: 'destructive' });
+      return;
     }
+    toast({ title: `${lines.length} alunos importados!`, description: 'Lista importada com sucesso.' });
+    setBulkText('');
+    setDialogOpen(false);
+    fetchAll();
   };
 
   const handleDelete = async (student: any) => {
     if (!confirm(`Deseja excluir ${student.name}?`)) return;
-    try {
-      const { error } = await supabase.from('students').delete().eq('id', student.id);
-      if (error) throw error;
-      toast({ title: 'Aluno excluído!' });
-      fetchAll();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err?.message, variant: 'destructive' });
-    }
+    const { error } = await supabase.from('students').delete().eq('id', student.id);
+    if (error) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Aluno excluído!' });
+    fetchAll();
   };
 
   const filteredStudents = students.filter(s => {
@@ -294,15 +282,7 @@ const StudentsPage: React.FC = () => {
       </div>
 
       {/* Students list */}
-      {fetchError ? (
-        <Card className="p-8 text-center space-y-3">
-          <AlertCircle className="w-10 h-10 text-destructive mx-auto opacity-70" />
-          <p className="text-destructive font-medium text-sm">{fetchError}</p>
-          <Button variant="outline" size="sm" onClick={fetchAll} className="gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
-          </Button>
-        </Card>
-      ) : loading ? (
+      {loading ? (
         <div className="space-y-2">
           {[1,2,3,4,5].map(i => <Card key={i} className="p-4 animate-pulse h-16 bg-muted" />)}
         </div>

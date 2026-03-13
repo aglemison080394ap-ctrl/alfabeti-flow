@@ -6,31 +6,21 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, UserCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, UserCheck } from 'lucide-react';
 
 const TeachersPage: React.FC = () => {
   const { toast } = useToast();
   const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
   const [form, setForm] = useState({ name: '', password: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchTeachers = async () => {
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const { data, error } = await supabase.from('teachers').select('*').order('name');
-      if (error) throw error;
-      setTeachers(data || []);
-    } catch (err: any) {
-      console.error('[TeachersPage] fetchTeachers:', err);
-      setFetchError(err?.message || 'Erro ao carregar professores.');
-    } finally {
-      setLoading(false);
-    }
+    const { data } = await supabase.from('teachers').select('*').order('name');
+    if (data) setTeachers(data);
+    setLoading(false);
   };
 
   useEffect(() => { fetchTeachers(); }, []);
@@ -55,25 +45,33 @@ const TeachersPage: React.FC = () => {
 
     setSaving(true);
 
-    try {
-      if (editingTeacher) {
-        const { error } = await supabase
-          .from('teachers')
-          .update({ name: form.name })
-          .eq('id', editingTeacher.id);
-        if (error) throw error;
-        toast({ title: 'Professor atualizado!' });
-      } else {
-        if (!form.password || form.password.length < 6) {
-          toast({ title: 'Senha obrigatória', description: 'Mínimo 6 caracteres.', variant: 'destructive' });
-          setSaving(false);
-          return;
-        }
+    if (editingTeacher) {
+      // Only update the name
+      const { error } = await supabase
+        .from('teachers')
+        .update({ name: form.name })
+        .eq('id', editingTeacher.id);
+      if (error) {
+        toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+      toast({ title: 'Professor atualizado!' });
+    } else {
+      if (!form.password || form.password.length < 6) {
+        toast({ title: 'Senha obrigatória', description: 'Mínimo 6 caracteres.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
+      // Create via edge function (generates synthetic email + auth user)
+      try {
         const { data: { session } } = await supabase.auth.getSession();
         const res = await supabase.functions.invoke('create-user', {
           body: { name: form.name, password: form.password, role: 'teacher' },
           headers: { Authorization: `Bearer ${session?.access_token}` },
         });
+
         if (res.error || res.data?.error) {
           const msg = res.data?.error || res.error?.message || 'Erro desconhecido';
           toast({ title: 'Erro ao cadastrar', description: msg, variant: 'destructive' });
@@ -81,27 +79,27 @@ const TeachersPage: React.FC = () => {
           return;
         }
         toast({ title: 'Professor cadastrado!', description: `${form.name} pode fazer login com o nome e senha definidos.` });
+      } catch (err) {
+        toast({ title: 'Erro inesperado', description: String(err), variant: 'destructive' });
+        setSaving(false);
+        return;
       }
-      setDialogOpen(false);
-      fetchTeachers();
-    } catch (err: any) {
-      console.error('[TeachersPage] handleSave:', err);
-      toast({ title: 'Erro inesperado', description: err?.message || String(err), variant: 'destructive' });
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
+    setDialogOpen(false);
+    fetchTeachers();
   };
 
   const handleDelete = async (teacher: any) => {
     if (!confirm(`Deseja excluir ${teacher.name}? As turmas vinculadas serão desvinculadas.`)) return;
-    try {
-      const { error } = await supabase.from('teachers').delete().eq('id', teacher.id);
-      if (error) throw error;
-      toast({ title: 'Professor excluído!' });
-      fetchTeachers();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err?.message, variant: 'destructive' });
+    const { error } = await supabase.from('teachers').delete().eq('id', teacher.id);
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      return;
     }
+    toast({ title: 'Professor excluído!' });
+    fetchTeachers();
   };
 
   const getInitials = (name: string) =>
@@ -163,15 +161,7 @@ const TeachersPage: React.FC = () => {
         </Dialog>
       </div>
 
-      {fetchError ? (
-        <Card className="p-8 text-center space-y-3">
-          <AlertCircle className="w-10 h-10 text-destructive mx-auto opacity-70" />
-          <p className="text-destructive font-medium text-sm">{fetchError}</p>
-          <Button variant="outline" size="sm" onClick={fetchTeachers} className="gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
-          </Button>
-        </Card>
-      ) : loading ? (
+      {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
             <Card key={i} className="p-5 animate-pulse h-24 bg-muted" />
