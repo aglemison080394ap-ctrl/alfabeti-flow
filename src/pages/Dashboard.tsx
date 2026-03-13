@@ -451,8 +451,8 @@ const Dashboard: React.FC = () => {
 
       {/* Donut Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <DonutCard title="Níveis de Escrita" icon={PenLine}  data={writingData} assessed={stats.assessed} />
-        <DonutCard title="Níveis de Leitura" icon={BookOpen} data={readingData} assessed={stats.assessed} />
+        <DonutCard title="Níveis de Escrita" icon={PenLine}  data={writingData} assessed={stats.assessed} loading={loading} selectedBimestre={selectedBimestre} />
+        <DonutCard title="Níveis de Leitura" icon={BookOpen} data={readingData} assessed={stats.assessed} loading={loading} selectedBimestre={selectedBimestre} />
       </div>
 
       {/* Evolution Line Chart */}
