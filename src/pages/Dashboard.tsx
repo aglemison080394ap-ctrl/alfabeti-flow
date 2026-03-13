@@ -26,6 +26,98 @@ const READING_LEVELS = {
 
 const GRADE_YEARS = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 
+/* ── Stable donut label (outside any component to prevent re-render loops) ── */
+const renderDonutLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  if (percent < 0.05) return null;
+  const RADIAN = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="bold">
+      {`${Math.round(percent * 100)}%`}
+    </text>
+  );
+};
+
+/* ── DonutCard — defined OUTSIDE Dashboard to avoid re-creation on every render ── */
+const DonutCard = React.memo(({
+  title, icon: Icon, data, assessed, loading, selectedBimestre,
+}: {
+  title: string; icon: React.ElementType; data: any[]; assessed: number;
+  loading: boolean; selectedBimestre: string;
+}) => (
+  <Card className="p-5 shadow-card">
+    <div className="flex items-center gap-2 mb-4">
+      <Icon className="w-5 h-5 text-primary" />
+      <h3 className="font-display font-bold text-foreground">{title}</h3>
+      <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+        {selectedBimestre}º Bimestre
+      </span>
+    </div>
+    <div className="flex gap-4 items-center">
+      <div className="flex flex-col gap-2 w-36 shrink-0">
+        <div className="rounded-lg bg-muted/60 px-3 py-2 text-center">
+          <p className="text-xl font-display font-bold text-foreground">{loading ? '…' : assessed}</p>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Avaliados</p>
+        </div>
+        {data.map(item => (
+          <div key={item.short} className="rounded-lg px-3 py-1.5 flex items-center justify-between"
+            style={{ backgroundColor: item.color + '18', border: `1px solid ${item.color}40` }}>
+            <span className="text-xs font-bold" style={{ color: item.color }}>{item.short}</span>
+            <span className="text-sm font-display font-bold text-foreground">{loading ? '…' : item.value}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex-1 flex flex-col items-center">
+        {assessed > 0 ? (
+          <>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={data.filter(d => d.value > 0)}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={98}
+                  dataKey="value" paddingAngle={2}
+                  labelLine={false} label={renderDonutLabel}
+                >
+                  {data.filter(d => d.value > 0).map((entry: any, i: number) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: any, _n: any, p: any) => [`${v} alunos (${p.payload.pct}%)`, p.payload.name]}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 -mt-2">
+              {data.map(item => (
+                <div key={item.short} className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-[10px] text-muted-foreground">{item.short} – {item.name}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+            <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
+              <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
+            </div>
+            <p>Sem dados</p>
+          </div>
+        )}
+      </div>
+    </div>
+  </Card>
+));
+
 const Dashboard: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const [allClasses, setAllClasses] = useState<any[]>([]);
