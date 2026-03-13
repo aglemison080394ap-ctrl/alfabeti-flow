@@ -313,11 +313,32 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* ─── Error states (locais — não derrubam o app) ─── */}
+        {classesError && (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1">{classesError}</span>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="gap-1.5 text-xs">
+              <RefreshCw className="w-3 h-3" /> Recarregar
+            </Button>
+          </div>
+        )}
+        {dashError && !classesError && (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1">{dashError}</span>
+            <Button variant="outline" size="sm" onClick={fetchDashboardData} className="gap-1.5 text-xs">
+              <RefreshCw className="w-3 h-3" /> Tentar novamente
+            </Button>
+          </div>
+        )}
+
         {/* ─── Filter Bar ─── */}
         {isAdmin && (
           <div className="flex flex-wrap items-center gap-3">
             {/* LEFT: Série + Turma + Bimestre */}
             <div className="flex flex-wrap items-center gap-3 flex-1">
+
               {/* 1º Filtro: Série/Ano */}
               <Select
                 value={selectedYear}
