@@ -121,8 +121,10 @@ const DonutCard = React.memo(({
 const Dashboard: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [classesError, setClassesError] = useState<string | null>(null);
+  const [dashError, setDashError] = useState<string | null>(null);
 
-  // Admin filters: selectedYear, selectedLetter, isOverallView (Visão Geral da Escola)
+  // Admin filters
   const [selectedYear, setSelectedYear]         = useState<string>('1º Ano');
   const [selectedLetter, setSelectedLetter]     = useState<string>('A');
   const [selectedBimestre, setSelectedBimestre] = useState<string>('1');
@@ -141,29 +143,31 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!profile) return;
     const loadClasses = async () => {
-      if (isAdmin) {
-        const { data } = await supabase
-          .from('classes')
-          .select('id, grade_year, class_letter, school_year')
-          .order('grade_year');
-        if (data) setAllClasses(data);
-      } else {
-        const { data: teacherData } = await supabase
-          .from('teachers')
-          .select('id')
-          .eq('user_id', profile.user_id)
-          .maybeSingle();
-        if (teacherData) {
-          const { data } = await supabase
-            .from('classes')
-            .select('id, grade_year, class_letter, school_year')
-            .eq('teacher_id', teacherData.id)
-            .order('grade_year');
-          if (data) {
-            setAllClasses(data);
-            if (data.length > 0) setSelectedClass(data[0].id);
+      setClassesError(null);
+      try {
+        if (isAdmin) {
+          const { data, error } = await supabase
+            .from('classes').select('id, grade_year, class_letter, school_year').order('grade_year');
+          if (error) throw error;
+          setAllClasses(data || []);
+        } else {
+          const { data: teacherData, error: tErr } = await supabase
+            .from('teachers').select('id').eq('user_id', profile.user_id).maybeSingle();
+          if (tErr) throw tErr;
+          if (teacherData) {
+            const { data, error } = await supabase
+              .from('classes').select('id, grade_year, class_letter, school_year')
+              .eq('teacher_id', teacherData.id).order('grade_year');
+            if (error) throw error;
+            const classList = data || [];
+            setAllClasses(classList);
+            if (classList.length > 0) setSelectedClass(classList[0].id);
           }
         }
+      } catch (err: any) {
+        console.error('[Dashboard] loadClasses:', err);
+        setClassesError(err?.message || 'Erro ao carregar turmas.');
+        setLoading(false);
       }
     };
     loadClasses();
@@ -184,6 +188,7 @@ const Dashboard: React.FC = () => {
 
   const fetchDashboardData = React.useCallback(async () => {
     setLoading(true);
+    setDashError(null);
     try {
       let classFilter: string[];
       if (isAdmin) {
@@ -209,7 +214,8 @@ const Dashboard: React.FC = () => {
       if (classFilter.length > 0) {
         studentsQuery = studentsQuery.in('class_id', classFilter);
       }
-      const { data: students } = await studentsQuery;
+      const { data: students, error: sErr } = await studentsQuery;
+      if (sErr) throw sErr;
       const studentIds    = students?.map(s => s.id) ?? [];
       const totalStudents = studentIds.length;
       const totalClasses  = classFilter.length;
@@ -223,17 +229,17 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      const { data: allAssessments } = await supabase
+      const { data: allAssessments, error: aErr } = await supabase
         .from('assessments')
         .select('student_id, bimestre, writing_level, reading_level')
         .in('student_id', studentIds.slice(0, 500));
+      if (aErr) throw aErr;
 
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
       const assessed   = currentBim.length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
-      // Writing counts
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
       setWritingData(
@@ -246,7 +252,6 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Reading counts
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
       setReadingData(
@@ -259,7 +264,6 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution across 4 bimestres
       const evo = (['1','2','3','4'] as const).map(b => {
         const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
         const total = bData.length;
@@ -270,6 +274,9 @@ const Dashboard: React.FC = () => {
         };
       });
       setEvolutionData(evo);
+    } catch (err: any) {
+      console.error('[Dashboard] fetchDashboardData:', err);
+      setDashError(err?.message || 'Erro ao carregar dados do dashboard.');
     } finally {
       setLoading(false);
     }
