@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard } from 'lucide-react';
+import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard, AlertCircle, RefreshCw } from 'lucide-react';
 
 const WRITING_LEVELS = {
   PS: { label: 'Pré-silábico',    color: '#ef4444', short: 'PS' },
