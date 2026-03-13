@@ -18,7 +18,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Pencil, Trash2, School, Users, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, School, Users, Search, AlertCircle, RefreshCw } from 'lucide-react';
 
 const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
@@ -30,6 +30,7 @@ const ClassesPage: React.FC = () => {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -44,40 +45,52 @@ const ClassesPage: React.FC = () => {
 
   const fetchAll = async () => {
     if (!profile) return;
+    setLoading(true);
+    setFetchError(null);
 
-    let classesQuery = supabase.from('classes').select('*, teachers(name)').order('grade_year').order('class_letter');
+    try {
+      let classesQuery = supabase.from('classes').select('*, teachers(name)').order('grade_year').order('class_letter');
 
-    if (!isAdmin) {
-      const { data: teacherData } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', profile.user_id)
-        .maybeSingle();
-      if (teacherData) {
-        classesQuery = classesQuery.eq('teacher_id', teacherData.id);
-      } else {
-        setClasses([]);
-        setLoading(false);
-        return;
+      if (!isAdmin) {
+        const { data: teacherData, error: tErr } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .maybeSingle();
+        if (tErr) throw tErr;
+        if (teacherData) {
+          classesQuery = classesQuery.eq('teacher_id', teacherData.id);
+        } else {
+          setClasses([]);
+          setLoading(false);
+          return;
+        }
       }
-    }
 
-    const [{ data: classesData }, { data: teachersData }, { data: studentsData }] = await Promise.all([
-      classesQuery,
-      supabase.from('teachers').select('id, name').order('name'),
-      supabase.from('students').select('class_id'),
-    ]);
-    if (classesData) setClasses(classesData);
-    if (teachersData) setTeachers(teachersData);
+      const [{ data: classesData, error: cErr }, { data: teachersData, error: tErr2 }, { data: studentsData, error: sErr }] = await Promise.all([
+        classesQuery,
+        supabase.from('teachers').select('id, name').order('name'),
+        supabase.from('students').select('class_id'),
+      ]);
 
-    if (studentsData) {
-      const counts: Record<string, number> = {};
-      studentsData.forEach(s => {
-        counts[s.class_id] = (counts[s.class_id] || 0) + 1;
-      });
-      setStudentCounts(counts);
+      if (cErr) throw cErr;
+      if (tErr2) throw tErr2;
+      if (sErr) throw sErr;
+
+      setClasses(classesData || []);
+      setTeachers(teachersData || []);
+
+      if (studentsData) {
+        const counts: Record<string, number> = {};
+        studentsData.forEach(s => { counts[s.class_id] = (counts[s.class_id] || 0) + 1; });
+        setStudentCounts(counts);
+      }
+    } catch (err: any) {
+      console.error('[ClassesPage] fetchAll:', err);
+      setFetchError(err?.message || 'Erro ao carregar turmas.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { fetchAll(); }, [profile]);
@@ -110,30 +123,31 @@ const ClassesPage: React.FC = () => {
       teacher_id: form.teacher_id || null,
       coordinator_name: form.coordinator_name || null,
     };
-
-    const { error } = editingClass
-      ? await supabase.from('classes').update(payload).eq('id', editingClass.id)
-      : await supabase.from('classes').insert(payload);
-
-    if (error) {
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
-      return;
+    try {
+      const { error } = editingClass
+        ? await supabase.from('classes').update(payload).eq('id', editingClass.id)
+        : await supabase.from('classes').insert(payload);
+      if (error) throw error;
+      toast({ title: editingClass ? 'Turma atualizada com sucesso!' : 'Turma criada com sucesso!' });
+      setDialogOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err?.message, variant: 'destructive' });
     }
-    toast({ title: editingClass ? 'Turma atualizada com sucesso!' : 'Turma criada com sucesso!' });
-    setDialogOpen(false);
-    fetchAll();
   };
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    const { error } = await supabase.from('classes').delete().eq('id', deleteTarget.id);
-    if (error) {
-      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const { error } = await supabase.from('classes').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
       toast({ title: 'Turma excluída', description: `${deleteTarget.grade_year} ${deleteTarget.class_letter} foi removida do sistema.` });
       fetchAll();
+    } catch (err: any) {
+      toast({ title: 'Erro ao excluir', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeleteTarget(null);
     }
-    setDeleteTarget(null);
   };
 
   const gradeColors: Record<string, string> = {
@@ -153,7 +167,6 @@ const ClassesPage: React.FC = () => {
     return matchesGrade && matchesSearch;
   });
 
-  // Group by grade for better readability with many classes
   const grouped = GRADES.reduce<Record<string, any[]>>((acc, grade) => {
     const items = filtered.filter(c => c.grade_year === grade);
     if (items.length > 0) acc[grade] = items;
@@ -162,7 +175,6 @@ const ClassesPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">Turmas</h1>
@@ -231,7 +243,6 @@ const ClassesPage: React.FC = () => {
         )}
       </div>
 
-      {/* Filters — somente para admins */}
       {isAdmin && classes.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-xs">
@@ -255,8 +266,15 @@ const ClassesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Content */}
-      {loading ? (
+      {fetchError ? (
+        <Card className="p-8 text-center space-y-3">
+          <AlertCircle className="w-10 h-10 text-destructive mx-auto opacity-70" />
+          <p className="text-destructive font-medium text-sm">{fetchError}</p>
+          <Button variant="outline" size="sm" onClick={fetchAll} className="gap-2">
+            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
+          </Button>
+        </Card>
+      ) : loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1,2,3,4,5,6,7,8].map(i => <Card key={i} className="p-5 animate-pulse h-32 bg-muted" />)}
         </div>
@@ -300,21 +318,18 @@ const ClassesPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-
                     <div className="flex items-center gap-1.5 mt-3">
                       <Users className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
                         <strong className="text-foreground">{studentCounts[cls.id] || 0}</strong> aluno(s)
                       </span>
                     </div>
-
-                    {cls.teachers && (
+                    {cls.teachers ? (
                       <div className="mt-1.5 flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                         <span className="text-xs text-muted-foreground truncate">{cls.teachers.name}</span>
                       </div>
-                    )}
-                    {!cls.teachers && (
+                    ) : (
                       <div className="mt-1.5 flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
                         <span className="text-xs text-muted-foreground">Sem professor</span>
@@ -334,7 +349,6 @@ const ClassesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
