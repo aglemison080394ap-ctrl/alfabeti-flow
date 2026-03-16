@@ -158,14 +158,6 @@ const SettingsPage: React.FC = () => {
     }
     setCreatingAdmin(true);
     try {
-      const res = await invokeManageAdmins({ action: 'noop' }); // warm up
-      const res2 = await (() => {
-        return supabase.functions.invoke('create-user', {
-          body: { email: adminEmail, password: adminPassword, name: adminName, role: 'admin' },
-          headers: { Authorization: '' },
-        });
-      })();
-      // Use create-user which already exists
       const session = await getSession();
       const result = await supabase.functions.invoke('create-user', {
         body: { email: adminEmail, password: adminPassword, name: adminName, role: 'admin' },
