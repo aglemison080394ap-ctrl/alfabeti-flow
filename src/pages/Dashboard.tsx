@@ -173,9 +173,9 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution across 4 bimestres
+      // Evolution across 4 bimestres — apenas avaliações válidas (com nível preenchido)
       const evo = (['1','2','3','4'] as const).map(b => {
-        const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
+        const bData = allAssessments?.filter(a => a.bimestre === b && (a.writing_level || a.reading_level)) ?? [];
         const total = bData.length;
         return {
           name: `${b}º Bim`,
