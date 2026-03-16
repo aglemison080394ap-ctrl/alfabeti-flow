@@ -142,7 +142,8 @@ const Dashboard: React.FC = () => {
         .in('student_id', studentIds.slice(0, 500));
 
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      const assessed   = currentBim.length;
+      // Apenas avaliações com pelo menos um nível preenchido (faltosos não contam)
+      const assessed   = currentBim.filter(a => a.writing_level || a.reading_level).length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
