@@ -306,31 +306,47 @@ const ReportsPage: React.FC = () => {
   ): Promise<HTMLCanvasElement> => {
     const html2canvas = (await import('html2canvas')).default;
 
-    const svgSizeMap = new Map<SVGElement, { w: number; h: number }>();
-    el.querySelectorAll<SVGElement>('svg').forEach(svg => {
-      const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0)
-        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
-    });
-
     const prev = {
       width: el.style.width, maxWidth: el.style.maxWidth,
       overflow: el.style.overflow, position: el.style.position,
-      transform: el.style.transform,
+      transform: el.style.transform, left: el.style.left, top: el.style.top,
     };
 
+    // Force layout at export width so Recharts re-renders at correct size
     el.style.width     = `${exportWidth}px`;
     el.style.maxWidth  = 'none';
     el.style.overflow  = 'visible';
     el.style.position  = 'relative';
     el.style.transform = 'none';
+    el.style.left      = '0';
+    el.style.top       = '0';
 
-    await new Promise(r => setTimeout(r, 800));
+    // Wait for Recharts SVGs to resize at new container width
+    await new Promise(r => setTimeout(r, 1200));
 
+    // Snapshot actual SVG dimensions AFTER reflow
+    const svgSizeMap = new Map<SVGElement, { w: number; h: number }>();
     el.querySelectorAll<SVGElement>('svg').forEach(svg => {
-      const r = svg.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0)
-        svgSizeMap.set(svg, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      const rect = svg.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0)
+        svgSizeMap.set(svg, { w: Math.ceil(rect.width), h: Math.ceil(rect.height) });
+    });
+
+    // Force explicit width/height on each SVG so html2canvas captures them fully
+    el.querySelectorAll<SVGElement>('svg').forEach(svg => {
+      const dims = svgSizeMap.get(svg);
+      if (dims) {
+        svg.setAttribute('width',  String(dims.w));
+        svg.setAttribute('height', String(dims.h));
+        svg.style.width  = `${dims.w}px`;
+        svg.style.height = `${dims.h}px`;
+        svg.style.overflow = 'visible';
+      }
+    });
+
+    // Also ensure ResponsiveContainer wrappers don't clip
+    el.querySelectorAll<HTMLElement>('.recharts-responsive-container').forEach(rc => {
+      rc.style.overflow = 'visible';
     });
 
     const W = el.scrollWidth;
@@ -344,11 +360,12 @@ const ReportsPage: React.FC = () => {
       allowTaint: false,
       width: W,
       height: H,
-      windowWidth:  W + 80,
-      windowHeight: H + 80,
+      windowWidth:  W + 120,
+      windowHeight: H + 120,
       x: 0,
       y: 0,
       onclone: (_doc: Document, clonedEl: HTMLElement) => {
+        // Apply captured dimensions to all SVGs in the cloned document
         const clonedSvgs = clonedEl.querySelectorAll<SVGElement>('svg');
         const origSvgs   = el.querySelectorAll<SVGElement>('svg');
         clonedSvgs.forEach((clonedSvg, i) => {
@@ -358,19 +375,36 @@ const ReportsPage: React.FC = () => {
           if (dims) {
             clonedSvg.setAttribute('width',  String(dims.w));
             clonedSvg.setAttribute('height', String(dims.h));
-            clonedSvg.style.width  = `${dims.w}px`;
-            clonedSvg.style.height = `${dims.h}px`;
+            clonedSvg.style.width    = `${dims.w}px`;
+            clonedSvg.style.height   = `${dims.h}px`;
+            clonedSvg.style.overflow = 'visible';
           }
         });
-        clonedEl.querySelectorAll<HTMLElement>('[style*="transform"]').forEach(node => {
-          node.style.transform = 'none';
+        // Remove any clipping transforms
+        clonedEl.querySelectorAll<HTMLElement>('*').forEach(node => {
+          const s = node.style;
+          if (s.transform && s.transform !== 'none') s.transform = 'none';
+          if (s.overflow === 'hidden') s.overflow = 'visible';
         });
-        (clonedEl as any).style['font-smooth'] = 'always';
-        (clonedEl as any).style['-webkit-font-smoothing'] = 'antialiased';
+        clonedEl.querySelectorAll<HTMLElement>('.recharts-responsive-container').forEach(rc => {
+          rc.style.overflow = 'visible';
+        });
+        (clonedEl as HTMLElement).style.setProperty('-webkit-font-smoothing', 'antialiased');
       },
     });
 
     Object.assign(el.style, prev);
+    // Restore SVG attributes to avoid visual glitch in screen
+    el.querySelectorAll<SVGElement>('svg').forEach(svg => {
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.style.width  = '';
+      svg.style.height = '';
+      svg.style.overflow = '';
+    });
+    el.querySelectorAll<HTMLElement>('.recharts-responsive-container').forEach(rc => {
+      rc.style.overflow = '';
+    });
     return canvas;
   };
 

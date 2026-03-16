@@ -142,7 +142,8 @@ const Dashboard: React.FC = () => {
         .in('student_id', studentIds.slice(0, 500));
 
       const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      const assessed   = currentBim.length;
+      // Apenas avaliações com pelo menos um nível preenchido (faltosos não contam)
+      const assessed   = currentBim.filter(a => a.writing_level || a.reading_level).length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
@@ -172,9 +173,9 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution across 4 bimestres
+      // Evolution across 4 bimestres — apenas avaliações válidas (com nível preenchido)
       const evo = (['1','2','3','4'] as const).map(b => {
-        const bData = allAssessments?.filter(a => a.bimestre === b) ?? [];
+        const bData = allAssessments?.filter(a => a.bimestre === b && (a.writing_level || a.reading_level)) ?? [];
         const total = bData.length;
         return {
           name: `${b}º Bim`,
