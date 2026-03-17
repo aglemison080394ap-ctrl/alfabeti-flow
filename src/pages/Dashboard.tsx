@@ -164,18 +164,20 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      const { data: allAssessments } = await supabase
-        .from('assessments')
-        .select('student_id, bimestre, writing_level, reading_level')
-        .in('student_id', studentIds.slice(0, 500));
+      // ── Fetch ALL assessments (batched to bypass Supabase row caps) ──────────
+      // Rule: a student is ASSESSED only if writing_level OR reading_level is set.
+      // Records with both null = absent/blank → treated as PENDING.
+      const allAssessments = await fetchAllAssessments(studentIds);
 
-      const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      // Apenas avaliações com pelo menos um nível preenchido (faltosos não contam)
-      const assessed   = currentBim.filter(a => a.writing_level || a.reading_level).length;
+      // Current bimestre — only valid assessments
+      const currentBim = allAssessments.filter(
+        a => a.bimestre === selectedBimestre && isValidAssessment(a)
+      );
+      const assessed = currentBim.length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
-      // Writing counts
+      // Writing counts (current bimestre, valid only)
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
       setWritingData(
@@ -188,7 +190,7 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Reading counts
+      // Reading counts (current bimestre, valid only)
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
       setReadingData(
@@ -201,14 +203,14 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution across 4 bimestres — apenas avaliações válidas (com nível preenchido)
+      // Evolution chart — each bimestre uses only valid assessments
       const evo = (['1','2','3','4'] as const).map(b => {
-        const bData = allAssessments?.filter(a => a.bimestre === b && (a.writing_level || a.reading_level)) ?? [];
+        const bData = allAssessments.filter(a => a.bimestre === b && isValidAssessment(a));
         const total = bData.length;
         return {
           name: `${b}º Bim`,
-          'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length / total) * 100) : 0,
-          'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length  / total) * 100) : 0,
+          'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length  / total) * 100) : 0,
+          'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length / total) * 100) : 0,
         };
       });
       setEvolutionData(evo);
