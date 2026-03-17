@@ -172,6 +172,76 @@ const Dashboard: React.FC = () => {
       // Records with both null = absent/blank → treated as PENDING.
       const allAssessments = await fetchAllAssessments(studentIds);
 
+      // ── VISÃO GERAL DA ESCOLA: ignora filtro de bimestre completamente ────────
+      if (isOverallView) {
+        // All valid assessments across ALL bimestres
+        const allValid = allAssessments.filter(isValidAssessment);
+
+        // Unique students assessed in ANY bimestre
+        const assessedStudentIds = new Set(allValid.map(a => a.student_id));
+        const assessedCount = assessedStudentIds.size;
+
+        setStats({ totalStudents, assessed: assessedCount, pending: totalStudents - assessedCount, totalClasses });
+
+        // Writing distribution — latest assessment per student (last bimestre with data)
+        // Use all valid writing records for distribution
+        const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
+        // For each student, use their most recent valid writing level
+        studentIds.forEach(sid => {
+          const studentAssessments = allValid
+            .filter(a => a.student_id === sid && a.writing_level)
+            .sort((a, b) => Number(b.bimestre) - Number(a.bimestre));
+          if (studentAssessments.length > 0 && studentAssessments[0].writing_level) {
+            wC[studentAssessments[0].writing_level]++;
+          }
+        });
+        const writingAssessed = Object.values(wC).reduce((s, v) => s + v, 0);
+        setWritingData(
+          Object.entries(wC).map(([key, value]) => ({
+            name:  WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].label,
+            short: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].short,
+            value,
+            color: WRITING_LEVELS[key as keyof typeof WRITING_LEVELS].color,
+            pct:   writingAssessed > 0 ? Math.round((value / writingAssessed) * 100) : 0,
+          }))
+        );
+
+        // Reading distribution — latest per student
+        const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
+        studentIds.forEach(sid => {
+          const studentAssessments = allValid
+            .filter(a => a.student_id === sid && a.reading_level)
+            .sort((a, b) => Number(b.bimestre) - Number(a.bimestre));
+          if (studentAssessments.length > 0 && studentAssessments[0].reading_level) {
+            rC[studentAssessments[0].reading_level]++;
+          }
+        });
+        const readingAssessed = Object.values(rC).reduce((s, v) => s + v, 0);
+        setReadingData(
+          Object.entries(rC).map(([key, value]) => ({
+            name:  READING_LEVELS[key as keyof typeof READING_LEVELS].label,
+            short: READING_LEVELS[key as keyof typeof READING_LEVELS].short,
+            value,
+            color: READING_LEVELS[key as keyof typeof READING_LEVELS].color,
+            pct:   readingAssessed > 0 ? Math.round((value / readingAssessed) * 100) : 0,
+          }))
+        );
+
+        // Evolution — all 4 bimestres, all classes
+        const evo = (['1','2','3','4'] as const).map(b => {
+          const bData = allAssessments.filter(a => a.bimestre === b && isValidAssessment(a));
+          const total = bData.length;
+          return {
+            name: `${b}º Bim`,
+            'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length  / total) * 100) : 0,
+            'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length / total) * 100) : 0,
+          };
+        });
+        setEvolutionData(evo);
+        return;
+      }
+
+      // ── VISÃO POR TURMA / ANO: aplica filtro de bimestre ──────────────────────
       // Current bimestre — only valid assessments
       const currentBim = allAssessments.filter(
         a => a.bimestre === selectedBimestre && isValidAssessment(a)
