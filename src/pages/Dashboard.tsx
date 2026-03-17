@@ -522,7 +522,9 @@ const Dashboard: React.FC = () => {
       {/* Context badge */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full border border-border">
-          Exibindo: <strong className="text-foreground">{contextLabel}</strong> · {selectedBimestre}º Bimestre
+          Exibindo: <strong className="text-foreground">{contextLabel}</strong>
+          {!isOverallView && <> · {selectedBimestre}º Bimestre</>}
+          {isOverallView && <span className="text-primary font-medium"> · Todos os Bimestres</span>}
         </span>
       </div>
 
