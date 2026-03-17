@@ -18,10 +18,21 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Pencil, Trash2, School, Users, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, School, Users, Search, CheckCircle2, Clock } from 'lucide-react';
 
 const GRADES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+const BIMESTRES = [
+  { value: '1', label: '1º Bimestre' },
+  { value: '2', label: '2º Bimestre' },
+  { value: '3', label: '3º Bimestre' },
+  { value: '4', label: '4º Bimestre' },
+];
+
+/** A class is considered "assessed" in a bimester when at least one student
+ *  in that class has writing_level OR reading_level filled for that bimester. */
+const isValidAssessment = (a: { writing_level: string | null; reading_level: string | null }) =>
+  !!(a.writing_level || a.reading_level);
 
 const ClassesPage: React.FC = () => {
   const { toast } = useToast();
@@ -35,6 +46,12 @@ const ClassesPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [filterGrade, setFilterGrade] = useState('all');
+
+  // Bimester selector for assessment status
+  const [currentBimestre, setCurrentBimestre] = useState<string>('1');
+  // classId -> { assessed: number, total: number }
+  const [assessmentStatus, setAssessmentStatus] = useState<Record<string, { assessed: number; total: number }>>({});
+
   const [form, setForm] = useState({
     grade_year: '',
     class_letter: '',
@@ -81,6 +98,60 @@ const ClassesPage: React.FC = () => {
   };
 
   useEffect(() => { fetchAll(); }, [profile]);
+
+  // Whenever classes or bimestre changes, recalculate assessment status
+  useEffect(() => {
+    if (classes.length === 0) return;
+    fetchAssessmentStatus(classes, currentBimestre);
+  }, [classes, currentBimestre]);
+
+  const fetchAssessmentStatus = async (classList: any[], bimestre: string) => {
+    // 1. Get all student IDs grouped by class
+    const classIds = classList.map(c => c.id);
+    const { data: studentsData } = await supabase
+      .from('students')
+      .select('id, class_id')
+      .in('class_id', classIds)
+      .limit(5000);
+
+    if (!studentsData || studentsData.length === 0) return;
+
+    const studentsByClass: Record<string, string[]> = {};
+    studentsData.forEach(s => {
+      if (!studentsByClass[s.class_id]) studentsByClass[s.class_id] = [];
+      studentsByClass[s.class_id].push(s.id);
+    });
+
+    const allStudentIds = studentsData.map(s => s.id);
+
+    // 2. Fetch assessments for the selected bimestre in batches
+    const BATCH = 250;
+    const assessments: { student_id: string; writing_level: string | null; reading_level: string | null }[] = [];
+    for (let i = 0; i < allStudentIds.length; i += BATCH) {
+      const chunk = allStudentIds.slice(i, i + BATCH);
+      const { data } = await supabase
+        .from('assessments')
+        .select('student_id, writing_level, reading_level')
+        .in('student_id', chunk)
+        .eq('bimestre', bimestre)
+        .limit(1000);
+      if (data) assessments.push(...data);
+    }
+
+    // 3. Build a Set of assessed student IDs (valid records only)
+    const assessedStudentIds = new Set(
+      assessments.filter(isValidAssessment).map(a => a.student_id)
+    );
+
+    // 4. Compute per-class stats
+    const status: Record<string, { assessed: number; total: number }> = {};
+    for (const [classId, ids] of Object.entries(studentsByClass)) {
+      const total = ids.length;
+      const assessed = ids.filter(id => assessedStudentIds.has(id)).length;
+      status[classId] = { assessed, total };
+    }
+    setAssessmentStatus(status);
+  };
 
   const openCreate = () => {
     setEditingClass(null);
@@ -153,12 +224,27 @@ const ClassesPage: React.FC = () => {
     return matchesGrade && matchesSearch;
   });
 
-  // Group by grade for better readability with many classes
+  // Group by grade
   const grouped = GRADES.reduce<Record<string, any[]>>((acc, grade) => {
     const items = filtered.filter(c => c.grade_year === grade);
     if (items.length > 0) acc[grade] = items;
     return acc;
   }, {});
+
+  // Derive assessment summary for filter section
+  const totalClasses = classes.length;
+  const fullyAssessed = classes.filter(cls => {
+    const s = assessmentStatus[cls.id];
+    return s && s.total > 0 && s.assessed === s.total;
+  }).length;
+  const partiallyAssessed = classes.filter(cls => {
+    const s = assessmentStatus[cls.id];
+    return s && s.assessed > 0 && s.assessed < s.total;
+  }).length;
+  const notAssessed = classes.filter(cls => {
+    const s = assessmentStatus[cls.id];
+    return !s || s.assessed === 0;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -231,6 +317,41 @@ const ClassesPage: React.FC = () => {
         )}
       </div>
 
+      {/* Bimester selector + summary bar */}
+      {classes.length > 0 && (
+        <Card className="p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground whitespace-nowrap">Status de sondagem:</span>
+              <Select value={currentBimestre} onValueChange={setCurrentBimestre}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BIMESTRES.map(b => (
+                    <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                {fullyAssessed} completa{fullyAssessed !== 1 ? 's' : ''}
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                <Clock className="w-4 h-4" />
+                {partiallyAssessed} parcial{partiallyAssessed !== 1 ? 'is' : ''}
+              </span>
+              <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                <Clock className="w-4 h-4 opacity-50" />
+                {notAssessed} pendente{notAssessed !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Filters — somente para admins */}
       {isAdmin && classes.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-3">
@@ -278,56 +399,91 @@ const ClassesPage: React.FC = () => {
                 <span>{items.length} turma(s)</span>
               </h2>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {items.map(cls => (
-                  <Card key={cls.id} className="p-4 shadow-card hover:shadow-hover transition-all group">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className={`px-2.5 py-1 rounded-lg border text-sm font-display font-bold ${getGradeColor(cls.grade_year)}`}>
-                        {cls.grade_year} – {cls.class_letter}
+                {items.map(cls => {
+                  const status = assessmentStatus[cls.id];
+                  const total = status?.total ?? studentCounts[cls.id] ?? 0;
+                  const assessed = status?.assessed ?? 0;
+                  const isComplete = total > 0 && assessed === total;
+                  const isPartial = assessed > 0 && assessed < total;
+                  const isPending = assessed === 0 || total === 0;
+
+                  const statusBg = isComplete
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : isPartial
+                    ? 'bg-amber-50 border-amber-200'
+                    : '';
+
+                  return (
+                    <Card key={cls.id} className={`p-4 shadow-card hover:shadow-hover transition-all group border ${statusBg}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className={`px-2.5 py-1 rounded-lg border text-sm font-display font-bold ${getGradeColor(cls.grade_year)}`}>
+                          {cls.grade_year} – {cls.class_letter}
+                        </div>
+                        {isAdmin && (
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cls)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteTarget(cls)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {isAdmin && (
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cls)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteTarget(cls)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+
+                      {/* Assessment status badge */}
+                      <div className="mt-2 mb-1">
+                        {isComplete ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Sondagem completa
+                          </span>
+                        ) : isPartial ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                            <Clock className="w-3 h-3" />
+                            {assessed}/{total} avaliado{assessed !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                            <Clock className="w-3 h-3 opacity-60" />
+                            Sondagem pendente
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          <strong className="text-foreground">{total}</strong> aluno{total !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      {cls.teachers && (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          <span className="text-xs text-muted-foreground truncate">{cls.teachers.name}</span>
                         </div>
                       )}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 mt-3">
-                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        <strong className="text-foreground">{studentCounts[cls.id] || 0}</strong> aluno(s)
-                      </span>
-                    </div>
-
-                    {cls.teachers && (
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                        <span className="text-xs text-muted-foreground truncate">{cls.teachers.name}</span>
-                      </div>
-                    )}
-                    {!cls.teachers && (
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-                        <span className="text-xs text-muted-foreground">Sem professor</span>
-                      </div>
-                    )}
-                    {cls.coordinator_name && (
-                      <div className="mt-1 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                        <span className="text-xs text-muted-foreground truncate">Coord: {cls.coordinator_name}</span>
-                      </div>
-                    )}
-                  </Card>
-                ))}
+                      {!cls.teachers && (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+                          <span className="text-xs text-muted-foreground">Sem professor</span>
+                        </div>
+                      )}
+                      {cls.coordinator_name && (
+                        <div className="mt-1 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                          <span className="text-xs text-muted-foreground truncate">Coord: {cls.coordinator_name}</span>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           ))}
