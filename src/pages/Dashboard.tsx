@@ -146,7 +146,10 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      let studentsQuery = supabase.from('students').select('id, class_id');
+      let studentsQuery = supabase
+        .from('students')
+        .select('id, class_id')
+        .limit(2000); // explicit high limit for large schools
       if (classFilter.length > 0) {
         studentsQuery = studentsQuery.in('class_id', classFilter);
       }
