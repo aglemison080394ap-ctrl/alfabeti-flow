@@ -133,7 +133,7 @@ const ClassesPage: React.FC = () => {
         .from('assessments')
         .select('student_id, writing_level, reading_level')
         .in('student_id', chunk)
-        .eq('bimestre', bimestre)
+        .eq('bimestre', bimestre as '1' | '2' | '3' | '4')
         .limit(1000);
       if (data) assessments.push(...data);
     }
