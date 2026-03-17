@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,34 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
 import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard } from 'lucide-react';
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SHARED RULE (used across ALL dashboard views):
+   A student is ASSESSED only when writing_level OR reading_level is filled.
+   Empty / null records (e.g. absences) are treated as PENDING.
+───────────────────────────────────────────────────────────────────────── */
+const isValidAssessment = (a: { writing_level: string | null; reading_level: string | null }) =>
+  !!(a.writing_level || a.reading_level);
+
+/**
+ * Fetches ALL assessments for the given student IDs in batches of 250,
+ * each batch limited to 1000 rows, to avoid Supabase's default row cap.
+ */
+async function fetchAllAssessments(studentIds: string[]) {
+  if (studentIds.length === 0) return [];
+  const BATCH = 250;
+  const results: { student_id: string; bimestre: string; writing_level: string | null; reading_level: string | null }[] = [];
+  for (let i = 0; i < studentIds.length; i += BATCH) {
+    const chunk = studentIds.slice(i, i + BATCH);
+    const { data } = await supabase
+      .from('assessments')
+      .select('student_id, bimestre, writing_level, reading_level')
+      .in('student_id', chunk)
+      .limit(1000);
+    if (data) results.push(...data);
+  }
+  return results;
+}
 
 const WRITING_LEVELS = {
   PS: { label: 'Pré-silábico',    color: '#ef4444', short: 'PS' },
