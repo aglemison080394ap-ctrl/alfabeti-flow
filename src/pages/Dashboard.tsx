@@ -316,9 +316,16 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center gap-2 mb-4">
           <Icon className="w-5 h-5 text-primary" />
           <h3 className="font-display font-bold text-foreground">{title}</h3>
-          <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-            {selectedBimestre}º Bimestre
-          </span>
+        {!isOverallView && (
+            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {selectedBimestre}º Bimestre
+            </span>
+          )}
+          {isOverallView && (
+            <span className="ml-auto text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">
+              Todos os Bimestres
+            </span>
+          )}
         </div>
         <div className="flex gap-4 items-center">
           {/* Left: stat cards */}
