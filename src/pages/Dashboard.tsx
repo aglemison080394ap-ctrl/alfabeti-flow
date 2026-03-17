@@ -10,6 +10,34 @@ import {
 } from 'recharts';
 import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard } from 'lucide-react';
 
+/* ─────────────────────────────────────────────────────────────────────────
+   SHARED RULE (used across ALL dashboard views):
+   A student is ASSESSED only when writing_level OR reading_level is filled.
+   Empty / null records (e.g. absences) are treated as PENDING.
+───────────────────────────────────────────────────────────────────────── */
+const isValidAssessment = (a: { writing_level: string | null; reading_level: string | null }) =>
+  !!(a.writing_level || a.reading_level);
+
+/**
+ * Fetches ALL assessments for the given student IDs in batches of 250,
+ * each batch limited to 1000 rows, to avoid Supabase's default row cap.
+ */
+async function fetchAllAssessments(studentIds: string[]) {
+  if (studentIds.length === 0) return [];
+  const BATCH = 250;
+  const results: { student_id: string; bimestre: string; writing_level: string | null; reading_level: string | null }[] = [];
+  for (let i = 0; i < studentIds.length; i += BATCH) {
+    const chunk = studentIds.slice(i, i + BATCH);
+    const { data } = await supabase
+      .from('assessments')
+      .select('student_id, bimestre, writing_level, reading_level')
+      .in('student_id', chunk)
+      .limit(1000);
+    if (data) results.push(...data);
+  }
+  return results;
+}
+
 const WRITING_LEVELS = {
   PS: { label: 'Pré-silábico',    color: '#ef4444', short: 'PS' },
   S:  { label: 'Silábico',        color: '#f59e0b', short: 'S'  },
@@ -118,7 +146,10 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      let studentsQuery = supabase.from('students').select('id, class_id');
+      let studentsQuery = supabase
+        .from('students')
+        .select('id, class_id')
+        .limit(2000); // explicit high limit for large schools
       if (classFilter.length > 0) {
         studentsQuery = studentsQuery.in('class_id', classFilter);
       }
@@ -136,18 +167,20 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      const { data: allAssessments } = await supabase
-        .from('assessments')
-        .select('student_id, bimestre, writing_level, reading_level')
-        .in('student_id', studentIds.slice(0, 500));
+      // ── Fetch ALL assessments (batched to bypass Supabase row caps) ──────────
+      // Rule: a student is ASSESSED only if writing_level OR reading_level is set.
+      // Records with both null = absent/blank → treated as PENDING.
+      const allAssessments = await fetchAllAssessments(studentIds);
 
-      const currentBim = allAssessments?.filter(a => a.bimestre === selectedBimestre) ?? [];
-      // Apenas avaliações com pelo menos um nível preenchido (faltosos não contam)
-      const assessed   = currentBim.filter(a => a.writing_level || a.reading_level).length;
+      // Current bimestre — only valid assessments
+      const currentBim = allAssessments.filter(
+        a => a.bimestre === selectedBimestre && isValidAssessment(a)
+      );
+      const assessed = currentBim.length;
 
       setStats({ totalStudents, assessed, pending: totalStudents - assessed, totalClasses });
 
-      // Writing counts
+      // Writing counts (current bimestre, valid only)
       const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
       currentBim.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
       setWritingData(
@@ -160,7 +193,7 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Reading counts
+      // Reading counts (current bimestre, valid only)
       const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
       currentBim.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
       setReadingData(
@@ -173,14 +206,14 @@ const Dashboard: React.FC = () => {
         }))
       );
 
-      // Evolution across 4 bimestres — apenas avaliações válidas (com nível preenchido)
+      // Evolution chart — each bimestre uses only valid assessments
       const evo = (['1','2','3','4'] as const).map(b => {
-        const bData = allAssessments?.filter(a => a.bimestre === b && (a.writing_level || a.reading_level)) ?? [];
+        const bData = allAssessments.filter(a => a.bimestre === b && isValidAssessment(a));
         const total = bData.length;
         return {
           name: `${b}º Bim`,
-          'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length / total) * 100) : 0,
-          'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length  / total) * 100) : 0,
+          'Alfabético': total > 0 ? Math.round((bData.filter(a => a.writing_level === 'A').length  / total) * 100) : 0,
+          'Leu Texto':  total > 0 ? Math.round((bData.filter(a => a.reading_level === 'LT').length / total) * 100) : 0,
         };
       });
       setEvolutionData(evo);
