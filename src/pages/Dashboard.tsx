@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
 
   // Reset letter when year changes (admin)
   useEffect(() => {
-    setSelectedLetter('A');
+    setSelectedLetter('all');
   }, [selectedYear]);
 
   // Compute which class IDs to query (admin)
@@ -376,7 +376,8 @@ const Dashboard: React.FC = () => {
   const contextLabel = (() => {
     if (isAdmin) {
       if (isOverallView) return 'Escola Toda';
-      return `${selectedYear} · Turma ${selectedLetter}`;
+      const turmaLabel = selectedLetter === 'all' ? 'Todas as Turmas' : `Turma ${selectedLetter}`;
+      return `${selectedYear} · ${turmaLabel}`;
     }
     if (selectedClass === 'all') return 'Todas as Turmas';
     const c = allClasses.find(x => x.id === selectedClass);
@@ -500,8 +501,7 @@ const Dashboard: React.FC = () => {
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full border border-border">
           Exibindo: <strong className="text-foreground">{contextLabel}</strong>
-          {!isOverallView && <> · {selectedBimestre}º Bimestre</>}
-          {isOverallView && <span className="text-primary font-medium"> · Todos os Bimestres</span>}
+          {' · '}{selectedBimestre}º Bimestre
         </span>
       </div>
 
