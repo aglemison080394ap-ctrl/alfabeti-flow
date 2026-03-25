@@ -427,6 +427,7 @@ const Dashboard: React.FC = () => {
                   <SelectValue placeholder="Turma" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
                   {['A','B','C','D','E','F','G','H','I'].map(l => (
                     <SelectItem key={l} value={l}>Turma {l}</SelectItem>
                   ))}
