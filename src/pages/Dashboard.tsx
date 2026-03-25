@@ -363,7 +363,7 @@ const Dashboard: React.FC = () => {
                 <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
                   <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
                 </div>
-                <p>Sem dados</p>
+                <p>Nenhum dado registrado neste bimestre.</p>
               </div>
             )}
           </div>
