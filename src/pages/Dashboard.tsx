@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
 
   // Reset letter when year changes (admin)
   useEffect(() => {
-    setSelectedLetter('A');
+    setSelectedLetter('all');
   }, [selectedYear]);
 
   // Compute which class IDs to query (admin)
@@ -172,29 +172,19 @@ const Dashboard: React.FC = () => {
       // Records with both null = absent/blank → treated as PENDING.
       const allAssessments = await fetchAllAssessments(studentIds);
 
-      // ── VISÃO GERAL DA ESCOLA: ignora filtro de bimestre completamente ────────
+      // ── VISÃO GERAL DA ESCOLA: respeita o bimestre selecionado ──────────────
+      // Valid assessments filtered to the selected bimestre
       if (isOverallView) {
-        // All valid assessments across ALL bimestres
-        const allValid = allAssessments.filter(isValidAssessment);
-
-        // Unique students assessed in ANY bimestre
-        const assessedStudentIds = new Set(allValid.map(a => a.student_id));
-        const assessedCount = assessedStudentIds.size;
+        const bimValid = allAssessments.filter(
+          a => a.bimestre === selectedBimestre && isValidAssessment(a)
+        );
+        const assessedCount = bimValid.length;
 
         setStats({ totalStudents, assessed: assessedCount, pending: totalStudents - assessedCount, totalClasses });
 
-        // Writing distribution — latest assessment per student (last bimestre with data)
-        // Use all valid writing records for distribution
+        // Writing distribution — selected bimestre only
         const wC: Record<string, number> = { PS: 0, S: 0, SA: 0, A: 0 };
-        // For each student, use their most recent valid writing level
-        studentIds.forEach(sid => {
-          const studentAssessments = allValid
-            .filter(a => a.student_id === sid && a.writing_level)
-            .sort((a, b) => Number(b.bimestre) - Number(a.bimestre));
-          if (studentAssessments.length > 0 && studentAssessments[0].writing_level) {
-            wC[studentAssessments[0].writing_level]++;
-          }
-        });
+        bimValid.forEach(a => { if (a.writing_level) wC[a.writing_level]++; });
         const writingAssessed = Object.values(wC).reduce((s, v) => s + v, 0);
         setWritingData(
           Object.entries(wC).map(([key, value]) => ({
@@ -206,16 +196,9 @@ const Dashboard: React.FC = () => {
           }))
         );
 
-        // Reading distribution — latest per student
+        // Reading distribution — selected bimestre only
         const rC: Record<string, number> = { NL: 0, LP: 0, LF: 0, LT: 0 };
-        studentIds.forEach(sid => {
-          const studentAssessments = allValid
-            .filter(a => a.student_id === sid && a.reading_level)
-            .sort((a, b) => Number(b.bimestre) - Number(a.bimestre));
-          if (studentAssessments.length > 0 && studentAssessments[0].reading_level) {
-            rC[studentAssessments[0].reading_level]++;
-          }
-        });
+        bimValid.forEach(a => { if (a.reading_level) rC[a.reading_level]++; });
         const readingAssessed = Object.values(rC).reduce((s, v) => s + v, 0);
         setReadingData(
           Object.entries(rC).map(([key, value]) => ({
@@ -316,16 +299,9 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center gap-2 mb-4">
           <Icon className="w-5 h-5 text-primary" />
           <h3 className="font-display font-bold text-foreground">{title}</h3>
-        {!isOverallView && (
-            <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {selectedBimestre}º Bimestre
-            </span>
-          )}
-          {isOverallView && (
-            <span className="ml-auto text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">
-              Todos os Bimestres
-            </span>
-          )}
+          <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {selectedBimestre}º Bimestre
+          </span>
         </div>
         <div className="flex gap-4 items-center">
           {/* Left: stat cards */}
@@ -387,7 +363,7 @@ const Dashboard: React.FC = () => {
                 <div className="w-16 h-16 rounded-full border-4 border-dashed border-border flex items-center justify-center">
                   <span className="text-2xl font-display font-bold text-muted-foreground/40">0</span>
                 </div>
-                <p>Sem dados</p>
+                <p>Nenhum dado registrado neste bimestre.</p>
               </div>
             )}
           </div>
@@ -400,7 +376,8 @@ const Dashboard: React.FC = () => {
   const contextLabel = (() => {
     if (isAdmin) {
       if (isOverallView) return 'Escola Toda';
-      return `${selectedYear} · Turma ${selectedLetter}`;
+      const turmaLabel = selectedLetter === 'all' ? 'Todas as Turmas' : `Turma ${selectedLetter}`;
+      return `${selectedYear} · ${turmaLabel}`;
     }
     if (selectedClass === 'all') return 'Todas as Turmas';
     const c = allClasses.find(x => x.id === selectedClass);
@@ -451,6 +428,7 @@ const Dashboard: React.FC = () => {
                   <SelectValue placeholder="Turma" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
                   {['A','B','C','D','E','F','G','H','I'].map(l => (
                     <SelectItem key={l} value={l}>Turma {l}</SelectItem>
                   ))}
@@ -523,8 +501,7 @@ const Dashboard: React.FC = () => {
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full border border-border">
           Exibindo: <strong className="text-foreground">{contextLabel}</strong>
-          {!isOverallView && <> · {selectedBimestre}º Bimestre</>}
-          {isOverallView && <span className="text-primary font-medium"> · Todos os Bimestres</span>}
+          {' · '}{selectedBimestre}º Bimestre
         </span>
       </div>
 
