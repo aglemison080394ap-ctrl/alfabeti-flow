@@ -7,6 +7,11 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Softer institutional navy (less heavy than the previous deep navy)
+const INSTITUTIONAL: [number, number, number] = [59, 102, 158];      // softened blue
+const INSTITUTIONAL_SOFT: [number, number, number] = [232, 240, 251]; // very light blue tint
+const INSTITUTIONAL_TEXT: [number, number, number] = [30, 58, 110];   // readable on soft tint
+
 // Institutional level colors (light tints for cell fill, dark for sigla badge)
 // Red (PS/NL), Yellow (S/LP), Blue (SA/LF), Green (A/LT)
 const LEVEL_COLORS: Record<string, { fill: [number, number, number]; sigla: [number, number, number]; text: [number, number, number] }> = {
@@ -221,9 +226,10 @@ const ExportAllClassesPDF: React.FC = () => {
                 valign: 'middle',
                 halign: 'center',
                 fontStyle: 'bold',
-                fillColor: [15, 45, 85],
+                fillColor: INSTITUTIONAL,
                 textColor: 255,
                 fontSize: 9,
+                cellPadding: { top: 2, right: 2, bottom: 2, left: 6 },
               },
             });
           }
@@ -250,22 +256,50 @@ const ExportAllClassesPDF: React.FC = () => {
 
         // Total row
         body.push([
-          { content: 'Total de alunos avaliados', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: [15, 45, 85], textColor: 255 } },
-          { content: String(assessedByBim['1'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
-          { content: String(assessedByBim['2'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
-          { content: String(assessedByBim['3'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
-          { content: String(assessedByBim['4'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
+          { content: 'Total de alunos avaliados', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: INSTITUTIONAL, textColor: 255 } },
+          { content: String(assessedByBim['1'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: INSTITUTIONAL_SOFT, textColor: INSTITUTIONAL_TEXT } },
+          { content: String(assessedByBim['2'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: INSTITUTIONAL_SOFT, textColor: INSTITUTIONAL_TEXT } },
+          { content: String(assessedByBim['3'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: INSTITUTIONAL_SOFT, textColor: INSTITUTIONAL_TEXT } },
+          { content: String(assessedByBim['4'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: INSTITUTIONAL_SOFT, textColor: INSTITUTIONAL_TEXT } },
         ]);
+
+        // Helpers to draw small white vector icons inside the Categoria cell
+        const drawPencil = (cx: number, cy: number) => {
+          doc.setDrawColor(255, 255, 255);
+          doc.setFillColor(255, 255, 255);
+          doc.setLineWidth(0.5);
+          // Pencil shaft (diagonal)
+          doc.line(cx - 1.8, cy + 1.8, cx + 1.4, cy - 1.4);
+          doc.line(cx - 1.4, cy + 2.2, cx + 1.8, cy - 1.0);
+          // Tip
+          doc.triangle(cx + 1.4, cy - 1.4, cx + 1.8, cy - 1.0, cx + 2.5, cy - 2.1, 'F');
+          // Eraser end
+          doc.circle(cx - 1.8, cy + 2.0, 0.55, 'F');
+        };
+        const drawBook = (cx: number, cy: number) => {
+          doc.setDrawColor(255, 255, 255);
+          doc.setFillColor(255, 255, 255);
+          doc.setLineWidth(0.5);
+          // Two pages
+          doc.rect(cx - 2.4, cy - 1.8, 2.2, 3.6, 'S');
+          doc.rect(cx + 0.2, cy - 1.8, 2.2, 3.6, 'S');
+          // Page lines
+          doc.setLineWidth(0.25);
+          doc.line(cx - 2.0, cy - 0.7, cx - 0.6, cy - 0.7);
+          doc.line(cx - 2.0, cy + 0.2, cx - 0.6, cy + 0.2);
+          doc.line(cx + 0.6, cy - 0.7, cx + 2.0, cy - 0.7);
+          doc.line(cx + 0.6, cy + 0.2, cx + 2.0, cy + 0.2);
+        };
 
         autoTable(doc, {
           startY: tableStartY,
           head: [['Categoria', 'Tipo', 'Sigla', '1º Bim', '2º Bim', '3º Bim', '4º Bim']],
           body,
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 1.8, halign: 'center', lineColor: [203, 213, 225], lineWidth: 0.15 },
-          headStyles: { fillColor: [15, 45, 85], textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+          styles: { fontSize: 8, cellPadding: 2, halign: 'center', lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [40, 50, 70] },
+          headStyles: { fillColor: INSTITUTIONAL, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center', cellPadding: 2.5 },
           columnStyles: {
-            0: { cellWidth: 22 },
+            0: { cellWidth: 24 },
             1: { cellWidth: 42, halign: 'left' },
             2: { cellWidth: 14 },
             3: { cellWidth: 'auto' },
@@ -274,6 +308,16 @@ const ExportAllClassesPDF: React.FC = () => {
             6: { cellWidth: 'auto' },
           },
           margin: { left: 10, right: 10 },
+          didDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 0 && data.cell.raw && (data.cell.raw as any).rowSpan) {
+              const txt = String((data.cell.raw as any).content || '');
+              const { x, y, height } = data.cell;
+              const iconX = x + 4.5;
+              const iconY = y + height / 2;
+              if (txt === 'ESCRITA') drawPencil(iconX, iconY);
+              else if (txt === 'LEITURA') drawBook(iconX, iconY);
+            }
+          },
         });
 
         const finalY = (doc as any).lastAutoTable.finalY ?? tableStartY + 60;
