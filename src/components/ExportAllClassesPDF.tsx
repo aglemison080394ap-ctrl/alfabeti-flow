@@ -7,6 +7,19 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Institutional level colors (light tints for cell fill, dark for sigla badge)
+// Red (PS/NL), Yellow (S/LP), Blue (SA/LF), Green (A/LT)
+const LEVEL_COLORS: Record<string, { fill: [number, number, number]; sigla: [number, number, number]; text: [number, number, number] }> = {
+  PS: { fill: [254, 226, 226], sigla: [220, 38, 38],  text: [127, 29, 29]  },
+  S:  { fill: [254, 243, 199], sigla: [217, 119, 6],  text: [120, 53, 15]  },
+  SA: { fill: [219, 234, 254], sigla: [37, 99, 235],  text: [30, 58, 138]  },
+  A:  { fill: [220, 252, 231], sigla: [22, 163, 74],  text: [20, 83, 45]   },
+  NL: { fill: [254, 226, 226], sigla: [220, 38, 38],  text: [127, 29, 29]  },
+  LP: { fill: [254, 243, 199], sigla: [217, 119, 6],  text: [120, 53, 15]  },
+  LF: { fill: [219, 234, 254], sigla: [37, 99, 235],  text: [30, 58, 138]  },
+  LT: { fill: [220, 252, 231], sigla: [22, 163, 74],  text: [20, 83, 45]   },
+};
+
 const WRITING_ROWS: { sigla: 'PS' | 'S' | 'SA' | 'A'; tipo: string }[] = [
   { sigla: 'PS', tipo: 'Pré-silábico' },
   { sigla: 'S',  tipo: 'Silábico' },
@@ -184,39 +197,64 @@ const ExportAllClassesPDF: React.FC = () => {
 
         const tableStartY = cursorY + 11;
 
-        // Build table body
+        // Build table body — each level row tinted with its institutional color
         const body: any[] = [];
-        // Writing section
+
+        const buildLevelRow = (
+          category: 'ESCRITA' | 'LEITURA',
+          isFirst: boolean,
+          rowSpan: number,
+          sigla: string,
+          tipo: string,
+          counts: Record<string, number>,
+        ) => {
+          const c = LEVEL_COLORS[sigla];
+          const tint = c.fill;
+          const dark = c.sigla;
+          const txt = c.text;
+          const cells: any[] = [];
+          if (isFirst) {
+            cells.push({
+              content: category,
+              rowSpan,
+              styles: {
+                valign: 'middle',
+                halign: 'center',
+                fontStyle: 'bold',
+                fillColor: [15, 45, 85],
+                textColor: 255,
+                fontSize: 9,
+              },
+            });
+          }
+          cells.push({ content: tipo,  styles: { halign: 'left',  fillColor: tint, textColor: txt, fontStyle: 'bold' } });
+          cells.push({ content: sigla, styles: { halign: 'center', fillColor: dark, textColor: 255, fontStyle: 'bold' } });
+          (['1','2','3','4'] as const).forEach(b => {
+            cells.push({ content: String(counts[b] || 0), styles: { halign: 'center', fillColor: tint, textColor: txt, fontStyle: 'bold' } });
+          });
+          return cells;
+        };
+
         WRITING_ROWS.forEach((r, i) => {
-          body.push([
-            i === 0 ? { content: 'ESCRITA', rowSpan: WRITING_ROWS.length, styles: { valign: 'middle', halign: 'center', fontStyle: 'bold', fillColor: [219, 234, 254] } } : null,
-            r.tipo,
-            r.sigla,
-            String(writeCounts['1'][r.sigla] || 0),
-            String(writeCounts['2'][r.sigla] || 0),
-            String(writeCounts['3'][r.sigla] || 0),
-            String(writeCounts['4'][r.sigla] || 0),
-          ].filter(c => c !== null));
+          body.push(buildLevelRow('ESCRITA', i === 0, WRITING_ROWS.length, r.sigla, r.tipo, {
+            '1': writeCounts['1'][r.sigla], '2': writeCounts['2'][r.sigla],
+            '3': writeCounts['3'][r.sigla], '4': writeCounts['4'][r.sigla],
+          }));
         });
-        // Reading section
         READING_ROWS.forEach((r, i) => {
-          body.push([
-            i === 0 ? { content: 'LEITURA', rowSpan: READING_ROWS.length, styles: { valign: 'middle', halign: 'center', fontStyle: 'bold', fillColor: [220, 252, 231] } } : null,
-            r.tipo,
-            r.sigla,
-            String(readCounts['1'][r.sigla] || 0),
-            String(readCounts['2'][r.sigla] || 0),
-            String(readCounts['3'][r.sigla] || 0),
-            String(readCounts['4'][r.sigla] || 0),
-          ].filter(c => c !== null));
+          body.push(buildLevelRow('LEITURA', i === 0, READING_ROWS.length, r.sigla, r.tipo, {
+            '1': readCounts['1'][r.sigla], '2': readCounts['2'][r.sigla],
+            '3': readCounts['3'][r.sigla], '4': readCounts['4'][r.sigla],
+          }));
         });
+
         // Total row
         body.push([
-          { content: 'Total avaliados', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: [243, 244, 246] } },
-          { content: String(assessedByBim['1'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [243, 244, 246] } },
-          { content: String(assessedByBim['2'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [243, 244, 246] } },
-          { content: String(assessedByBim['3'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [243, 244, 246] } },
-          { content: String(assessedByBim['4'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [243, 244, 246] } },
+          { content: 'Total de alunos avaliados', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: [15, 45, 85], textColor: 255 } },
+          { content: String(assessedByBim['1'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
+          { content: String(assessedByBim['2'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
+          { content: String(assessedByBim['3'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
+          { content: String(assessedByBim['4'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: [226, 232, 240], textColor: [15, 45, 85] } },
         ]);
 
         autoTable(doc, {
@@ -224,8 +262,8 @@ const ExportAllClassesPDF: React.FC = () => {
           head: [['Categoria', 'Tipo', 'Sigla', '1º Bim', '2º Bim', '3º Bim', '4º Bim']],
           body,
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 1.5, halign: 'center' },
-          headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+          styles: { fontSize: 8, cellPadding: 1.8, halign: 'center', lineColor: [203, 213, 225], lineWidth: 0.15 },
+          headStyles: { fillColor: [15, 45, 85], textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
           columnStyles: {
             0: { cellWidth: 22 },
             1: { cellWidth: 42, halign: 'left' },
