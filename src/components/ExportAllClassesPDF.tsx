@@ -223,13 +223,14 @@ const ExportAllClassesPDF: React.FC = () => {
               content: category,
               rowSpan,
               styles: {
-                valign: 'middle',
+                valign: 'bottom',
                 halign: 'center',
                 fontStyle: 'bold',
                 fillColor: INSTITUTIONAL,
                 textColor: 255,
                 fontSize: 9,
-                cellPadding: { top: 2, right: 2, bottom: 2, left: 6 },
+                // Extra top padding so the icon (drawn above) doesn't overlap text
+                cellPadding: { top: 12, right: 2, bottom: 4, left: 2 },
               },
             });
           }
@@ -263,32 +264,67 @@ const ExportAllClassesPDF: React.FC = () => {
           { content: String(assessedByBim['4'].size), styles: { fontStyle: 'bold', halign: 'center', fillColor: INSTITUTIONAL_SOFT, textColor: INSTITUTIONAL_TEXT } },
         ]);
 
-        // Helpers to draw small white vector icons inside the Categoria cell
+        // ===== Colored vector icons drawn ABOVE the category label =====
+        // Pencil: yellow body, pink eraser, dark tip — horizontal orientation
         const drawPencil = (cx: number, cy: number) => {
-          doc.setDrawColor(255, 255, 255);
-          doc.setFillColor(255, 255, 255);
-          doc.setLineWidth(0.5);
-          // Pencil shaft (diagonal)
-          doc.line(cx - 1.8, cy + 1.8, cx + 1.4, cy - 1.4);
-          doc.line(cx - 1.4, cy + 2.2, cx + 1.8, cy - 1.0);
-          // Tip
-          doc.triangle(cx + 1.4, cy - 1.4, cx + 1.8, cy - 1.0, cx + 2.5, cy - 2.1, 'F');
-          // Eraser end
-          doc.circle(cx - 1.8, cy + 2.0, 0.55, 'F');
+          // Shadow / subtle base
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.15);
+
+          // Yellow body (rectangle)
+          doc.setFillColor(250, 204, 21); // amber-400
+          doc.rect(cx - 4, cy - 1.2, 6.5, 2.4, 'F');
+          doc.rect(cx - 4, cy - 1.2, 6.5, 2.4, 'S');
+
+          // Pink eraser (left)
+          doc.setFillColor(244, 114, 182); // pink-400
+          doc.rect(cx - 5.4, cy - 1.2, 1.4, 2.4, 'F');
+          doc.rect(cx - 5.4, cy - 1.2, 1.4, 2.4, 'S');
+
+          // Metal ferrule (thin grey strip)
+          doc.setFillColor(156, 163, 175); // grey-400
+          doc.rect(cx - 4.1, cy - 1.2, 0.5, 2.4, 'F');
+
+          // Wood tip (light tan triangle)
+          doc.setFillColor(253, 230, 138); // amber-200
+          doc.triangle(cx + 2.5, cy - 1.2, cx + 2.5, cy + 1.2, cx + 4.2, cy, 'F');
+          doc.triangle(cx + 2.5, cy - 1.2, cx + 2.5, cy + 1.2, cx + 4.2, cy, 'S');
+
+          // Dark graphite tip
+          doc.setFillColor(31, 41, 55); // slate-800
+          doc.triangle(cx + 3.7, cy - 0.35, cx + 3.7, cy + 0.35, cx + 4.2, cy, 'F');
         };
+
+        // Book: blue cover, white pages
         const drawBook = (cx: number, cy: number) => {
-          doc.setDrawColor(255, 255, 255);
-          doc.setFillColor(255, 255, 255);
-          doc.setLineWidth(0.5);
-          // Two pages
-          doc.rect(cx - 2.4, cy - 1.8, 2.2, 3.6, 'S');
-          doc.rect(cx + 0.2, cy - 1.8, 2.2, 3.6, 'S');
-          // Page lines
+          doc.setDrawColor(30, 58, 138); // navy outline
           doc.setLineWidth(0.25);
-          doc.line(cx - 2.0, cy - 0.7, cx - 0.6, cy - 0.7);
-          doc.line(cx - 2.0, cy + 0.2, cx - 0.6, cy + 0.2);
-          doc.line(cx + 0.6, cy - 0.7, cx + 2.0, cy - 0.7);
-          doc.line(cx + 0.6, cy + 0.2, cx + 2.0, cy + 0.2);
+
+          // Back cover (slight offset for depth)
+          doc.setFillColor(96, 165, 250); // blue-400
+          doc.rect(cx - 4.2, cy - 2.6, 8.4, 5.2, 'F');
+
+          // White pages
+          doc.setFillColor(255, 255, 255);
+          doc.rect(cx - 3.8, cy - 2.3, 8.0, 4.6, 'F');
+          doc.rect(cx - 3.8, cy - 2.3, 8.0, 4.6, 'S');
+
+          // Spine (center vertical line)
+          doc.setDrawColor(59, 130, 246); // blue-500
+          doc.setLineWidth(0.4);
+          doc.line(cx, cy - 2.3, cx, cy + 2.3);
+
+          // Page lines (left)
+          doc.setDrawColor(148, 163, 184); // slate-400
+          doc.setLineWidth(0.18);
+          doc.line(cx - 3.2, cy - 1.2, cx - 0.5, cy - 1.2);
+          doc.line(cx - 3.2, cy - 0.2, cx - 0.5, cy - 0.2);
+          doc.line(cx - 3.2, cy + 0.8, cx - 0.5, cy + 0.8);
+
+          // Page lines (right)
+          doc.line(cx + 0.5, cy - 1.2, cx + 3.2, cy - 1.2);
+          doc.line(cx + 0.5, cy - 0.2, cx + 3.2, cy - 0.2);
+          doc.line(cx + 0.5, cy + 0.8, cx + 3.2, cy + 0.8);
         };
 
         autoTable(doc, {
@@ -299,7 +335,7 @@ const ExportAllClassesPDF: React.FC = () => {
           styles: { fontSize: 8, cellPadding: 2, halign: 'center', lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [40, 50, 70] },
           headStyles: { fillColor: INSTITUTIONAL, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center', cellPadding: 2.5 },
           columnStyles: {
-            0: { cellWidth: 24 },
+            0: { cellWidth: 26 },
             1: { cellWidth: 42, halign: 'left' },
             2: { cellWidth: 14 },
             3: { cellWidth: 'auto' },
@@ -311,9 +347,10 @@ const ExportAllClassesPDF: React.FC = () => {
           didDrawCell: (data) => {
             if (data.section === 'body' && data.column.index === 0 && data.cell.raw && (data.cell.raw as any).rowSpan) {
               const txt = String((data.cell.raw as any).content || '');
-              const { x, y, height } = data.cell;
-              const iconX = x + 4.5;
-              const iconY = y + height / 2;
+              const { x, y, width } = data.cell;
+              // Position icon centered horizontally, near the TOP of the merged cell (above text)
+              const iconX = x + width / 2;
+              const iconY = y + 5; // ~5mm down from top edge
               if (txt === 'ESCRITA') drawPencil(iconX, iconY);
               else if (txt === 'LEITURA') drawBook(iconX, iconY);
             }
