@@ -7,6 +7,19 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Institutional level colors (light tints for cell fill, dark for sigla badge)
+// Red (PS/NL), Yellow (S/LP), Blue (SA/LF), Green (A/LT)
+const LEVEL_COLORS: Record<string, { fill: [number, number, number]; sigla: [number, number, number]; text: [number, number, number] }> = {
+  PS: { fill: [254, 226, 226], sigla: [220, 38, 38],  text: [127, 29, 29]  },
+  S:  { fill: [254, 243, 199], sigla: [217, 119, 6],  text: [120, 53, 15]  },
+  SA: { fill: [219, 234, 254], sigla: [37, 99, 235],  text: [30, 58, 138]  },
+  A:  { fill: [220, 252, 231], sigla: [22, 163, 74],  text: [20, 83, 45]   },
+  NL: { fill: [254, 226, 226], sigla: [220, 38, 38],  text: [127, 29, 29]  },
+  LP: { fill: [254, 243, 199], sigla: [217, 119, 6],  text: [120, 53, 15]  },
+  LF: { fill: [219, 234, 254], sigla: [37, 99, 235],  text: [30, 58, 138]  },
+  LT: { fill: [220, 252, 231], sigla: [22, 163, 74],  text: [20, 83, 45]   },
+};
+
 const WRITING_ROWS: { sigla: 'PS' | 'S' | 'SA' | 'A'; tipo: string }[] = [
   { sigla: 'PS', tipo: 'Pré-silábico' },
   { sigla: 'S',  tipo: 'Silábico' },
