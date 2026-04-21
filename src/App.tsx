@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import Dashboard from "@/pages/Dashboard";
 import TeachersPage from "@/pages/TeachersPage";
@@ -18,16 +19,36 @@ import SettingsPage from "@/pages/SettingsPage";
 import TeacherProfilePage from "@/pages/TeacherProfilePage";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
+});
+
+// Global handlers to surface silent failures in console
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('[Global] Unhandled promise rejection:', e.reason);
+  });
+  window.addEventListener('error', (e) => {
+    console.error('[Global] Uncaught error:', e.error || e.message);
+  });
+}
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <ErrorBoundary>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
             
             <Route path="/" element={
@@ -72,10 +93,12 @@ const App = () => (
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            </ErrorBoundary>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
