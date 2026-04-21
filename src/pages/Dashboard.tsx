@@ -9,6 +9,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
 import { Users, ClipboardCheck, Clock, School, BookOpen, TrendingUp, PenLine, LayoutDashboard } from 'lucide-react';
+import ExportAllClassesPDF from '@/components/ExportAllClassesPDF';
 
 /* ─────────────────────────────────────────────────────────────────────────
    SHARED RULE (used across ALL dashboard views):
