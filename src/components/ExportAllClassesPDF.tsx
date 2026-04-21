@@ -7,10 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Softer institutional navy (less heavy than the previous deep navy)
-const INSTITUTIONAL: [number, number, number] = [59, 102, 158];      // softened blue
-const INSTITUTIONAL_SOFT: [number, number, number] = [232, 240, 251]; // very light blue tint
-const INSTITUTIONAL_TEXT: [number, number, number] = [30, 58, 110];   // readable on soft tint
+// Institutional navy — slightly darker than the softened version, but lighter than the original
+const INSTITUTIONAL: [number, number, number] = [36, 73, 125];        // deeper navy blue
+const INSTITUTIONAL_SOFT: [number, number, number] = [226, 235, 247]; // very light blue tint
+const INSTITUTIONAL_TEXT: [number, number, number] = [22, 48, 90];    // readable on soft tint
 
 // Institutional level colors (light tints for cell fill, dark for sigla badge)
 // Red (PS/NL), Yellow (S/LP), Blue (SA/LF), Green (A/LT)
