@@ -396,6 +396,7 @@ const Dashboard: React.FC = () => {
               Bem-vindo(a), {profile?.name?.split(' ')[0]}! Aqui está o panorama atual.
             </p>
           </div>
+          {isAdmin && <ExportAllClassesPDF />}
         </div>
 
         {/* ─── Filter Bar ─── */}
