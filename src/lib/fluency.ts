@@ -9,6 +9,8 @@ export interface FluencyCounts {
 
 export interface FluencyResult extends FluencyCounts {
   total: number;
+  matriculados: number;
+  participacao: number;
   pPL1: number;
   pPL2: number;
   pPL3: number;
@@ -49,7 +51,7 @@ export function classifyIFL(ifl: number): { label: string; color: string } {
   return { label: 'Situação Avançada', color: '#16a34a' };
 }
 
-export function calculateFluency(counts: FluencyCounts): FluencyResult {
+export function calculateFluency(counts: FluencyCounts, matriculados = 0): FluencyResult {
   const { pl1, pl2, pl3, pl4, li, lf } = counts;
   const total = pl1 + pl2 + pl3 + pl4 + li + lf;
   const safe = total > 0 ? total : 1;
@@ -63,6 +65,7 @@ export function calculateFluency(counts: FluencyCounts): FluencyResult {
     ? pPL1 * 0 + pPL2 * 1 + pPL3 * 2.5 + pPL4 * 4 + pLI * 6 + pLF * 10
     : 0;
   const taxaLeitores = total > 0 ? ((li + lf) / total) * 100 : 0;
+  const participacao = matriculados > 0 ? Math.min(100, (total / matriculados) * 100) : 0;
   const { label: classification, color: classificationColor } = classifyIFL(ifl);
 
   const entries: Array<[keyof FluencyCounts, number]> = [
@@ -73,9 +76,9 @@ export function calculateFluency(counts: FluencyCounts): FluencyResult {
 
   const diagnostico = total === 0
     ? 'Informe a quantidade de estudantes em cada perfil para gerar o diagnóstico.'
-    : `Foram avaliados ${total} estudante(s). O Índice de Fluência Leitora (IFL) obtido foi ${ifl.toFixed(2)}, ` +
-      `classificado como ${classification}. A taxa de leitores corresponde a ${taxaLeitores.toFixed(1)}%. ` +
-      `O perfil predominante da turma é ${predominante}. ` +
+    : `Foram avaliados ${total} estudante(s)${matriculados > 0 ? ` de ${matriculados} matriculado(s) (participação de ${participacao.toFixed(1)}%)` : ''}. ` +
+      `O Índice de Fluência Leitora (IFL) obtido foi ${ifl.toFixed(2)}, classificado como ${classification}. ` +
+      `A taxa de leitores corresponde a ${taxaLeitores.toFixed(1)}%. O perfil predominante da turma é ${predominante}. ` +
       (ifl < 4
         ? 'Recomenda-se intervenção pedagógica intensiva e individualizada, com foco em consciência fonológica e decodificação.'
         : ifl < 6
@@ -87,6 +90,8 @@ export function calculateFluency(counts: FluencyCounts): FluencyResult {
   return {
     pl1, pl2, pl3, pl4, li, lf,
     total,
+    matriculados,
+    participacao: Number(participacao.toFixed(2)),
     pPL1, pPL2, pPL3, pPL4, pLI, pLF,
     ifl: Number(ifl.toFixed(2)),
     taxaLeitores: Number(taxaLeitores.toFixed(2)),
