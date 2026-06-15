@@ -99,6 +99,93 @@ export type Database = {
           },
         ]
       }
+      fluency_simulations: {
+        Row: {
+          class_id: string | null
+          class_label: string
+          classification: string
+          created_at: string
+          created_by: string
+          diagnostico: string
+          id: string
+          ifl: number
+          lf: number
+          li: number
+          pl1: number
+          pl2: number
+          pl3: number
+          pl4: number
+          school_name: string
+          school_year: number
+          taxa_leitores: number
+          teacher_id: string | null
+          teacher_name: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          class_id?: string | null
+          class_label: string
+          classification: string
+          created_at?: string
+          created_by: string
+          diagnostico: string
+          id?: string
+          ifl: number
+          lf?: number
+          li?: number
+          pl1?: number
+          pl2?: number
+          pl3?: number
+          pl4?: number
+          school_name: string
+          school_year: number
+          taxa_leitores: number
+          teacher_id?: string | null
+          teacher_name: string
+          total: number
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string | null
+          class_label?: string
+          classification?: string
+          created_at?: string
+          created_by?: string
+          diagnostico?: string
+          id?: string
+          ifl?: number
+          lf?: number
+          li?: number
+          pl1?: number
+          pl2?: number
+          pl3?: number
+          pl4?: number
+          school_name?: string
+          school_year?: number
+          taxa_leitores?: number
+          teacher_id?: string | null
+          teacher_name?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fluency_simulations_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fluency_simulations_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

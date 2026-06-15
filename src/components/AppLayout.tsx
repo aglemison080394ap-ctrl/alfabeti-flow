@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   BookOpen, LayoutDashboard, Users, School, GraduationCap,
-  ClipboardList, BarChart3, Settings, LogOut, Menu, ChevronRight, UserCog
+  ClipboardList, BarChart3, Settings, LogOut, Menu, ChevronRight, UserCog, BookOpenCheck, Gauge
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,8 @@ const navItems = [
   { icon: School,          label: 'Turmas',        path: '/turmas',        roles: ['admin', 'teacher'] },
   { icon: GraduationCap,   label: 'Alunos',        path: '/alunos',        roles: ['admin', 'teacher'] },
   { icon: ClipboardList,   label: 'Sondagens',     path: '/sondagens',     roles: ['admin', 'teacher'] },
+  { icon: BookOpenCheck,   label: 'Fluência Leitora', path: '/fluencia',   roles: ['admin', 'teacher'] },
+  { icon: Gauge,           label: 'Painel Fluência', path: '/fluencia/painel', roles: ['admin'] },
   { icon: BarChart3,       label: 'Relatórios',    path: '/relatorios',    roles: ['admin', 'teacher'] },
   { icon: UserCog,         label: 'Meu Perfil',    path: '/meu-perfil',    roles: ['teacher'] },
   { icon: Settings,        label: 'Configurações', path: '/configuracoes', roles: ['admin'] },
