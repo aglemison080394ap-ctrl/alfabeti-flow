@@ -17,8 +17,6 @@ import AssessmentsPage from "@/pages/AssessmentsPage";
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import TeacherProfilePage from "@/pages/TeacherProfilePage";
-import FluencyPage from "@/pages/FluencyPage";
-import FluencyAdminPage from "@/pages/FluencyAdminPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -91,16 +89,6 @@ const App = () => (
             <Route path="/meu-perfil" element={
               <ProtectedRoute>
                 <AppLayout><TeacherProfilePage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/fluencia" element={
-              <ProtectedRoute>
-                <AppLayout><FluencyPage /></AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/fluencia/painel" element={
-              <ProtectedRoute adminOnly>
-                <AppLayout><FluencyAdminPage /></AppLayout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
