@@ -17,12 +17,13 @@ const Gauge: React.FC<GaugeProps> = ({ value, max, label, suffix = '', color = '
   const start = polar(cx, cy, r, -90);
   const end = polar(cx, cy, r, 90);
   const needle = polar(cx, cy, r - 12, angle);
+  const gradId = React.useMemo(() => `g-${Math.random().toString(36).slice(2, 10)}`, []);
 
   return (
     <div className="flex flex-col items-center">
-      <svg viewBox="0 0 200 120" className="w-full max-w-[220px]">
+      <svg viewBox="0 0 200 120" className="w-full max-w-[240px]">
         <defs>
-          <linearGradient id={`g-${label}`} x1="0" x2="1">
+          <linearGradient id={gradId} x1="0" x2="1">
             <stop offset="0%" stopColor="#dc2626" />
             <stop offset="25%" stopColor="#f97316" />
             <stop offset="50%" stopColor="#eab308" />
