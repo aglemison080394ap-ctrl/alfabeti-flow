@@ -33,7 +33,7 @@ const Gauge: React.FC<GaugeProps> = ({ value, max, label, suffix = '', color = '
         </defs>
         <path
           d={`M ${start.x} ${start.y} A ${r} ${r} 0 0 1 ${end.x} ${end.y}`}
-          stroke={`url(#g-${label})`}
+          stroke={`url(#${gradId})`}
           strokeWidth="16"
           fill="none"
           strokeLinecap="round"
