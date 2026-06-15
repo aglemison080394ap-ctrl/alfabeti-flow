@@ -15,7 +15,7 @@ const navItems = [
   { icon: School,          label: 'Turmas',        path: '/turmas',        roles: ['admin', 'teacher'] },
   { icon: GraduationCap,   label: 'Alunos',        path: '/alunos',        roles: ['admin', 'teacher'] },
   { icon: ClipboardList,   label: 'Sondagens',     path: '/sondagens',     roles: ['admin', 'teacher'] },
-  { icon: BookOpenCheck,   label: 'Fluência Leitora', path: '/fluencia',   roles: ['admin', 'teacher'] },
+  { icon: BookOpenCheck,   label: 'Fluência Leitora', path: '/fluencia',   roles: ['teacher'] },
   { icon: Gauge,           label: 'Painel Fluência', path: '/fluencia/painel', roles: ['admin'] },
   { icon: BarChart3,       label: 'Relatórios',    path: '/relatorios',    roles: ['admin', 'teacher'] },
   { icon: UserCog,         label: 'Meu Perfil',    path: '/meu-perfil',    roles: ['teacher'] },

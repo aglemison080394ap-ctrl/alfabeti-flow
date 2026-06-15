@@ -111,6 +111,8 @@ export type Database = {
           ifl: number
           lf: number
           li: number
+          matriculados: number
+          participacao: number
           pl1: number
           pl2: number
           pl3: number
@@ -134,6 +136,8 @@ export type Database = {
           ifl: number
           lf?: number
           li?: number
+          matriculados?: number
+          participacao?: number
           pl1?: number
           pl2?: number
           pl3?: number
@@ -157,6 +161,8 @@ export type Database = {
           ifl?: number
           lf?: number
           li?: number
+          matriculados?: number
+          participacao?: number
           pl1?: number
           pl2?: number
           pl3?: number
